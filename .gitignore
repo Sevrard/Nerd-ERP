@@ -1,0 +1,14 @@
+# Backend
+backend/target/
+backend/application-local.yml
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.angular/
+frontend/.npm-cache/
+
+# IDE / OS
+.idea/
+*.iml
+.DS_Store

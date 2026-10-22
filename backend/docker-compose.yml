@@ -1,0 +1,14 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: nerd_erp
+      POSTGRES_USER: nerd_erp
+      POSTGRES_PASSWORD: nerd_erp
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - nerd_erp_pgdata:/var/lib/postgresql/data
+
+volumes:
+  nerd_erp_pgdata:

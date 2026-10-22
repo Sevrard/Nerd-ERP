@@ -1,0 +1,2 @@
+# Les règles projet sont dans .cursor/rules/nerd-erp.mdc (alwaysApply).
+# Ce fichier est volontairement minimal pour éviter un double prompt avec les .mdc.

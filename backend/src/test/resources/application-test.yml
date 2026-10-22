@@ -1,0 +1,16 @@
+nerd:
+  bootstrap:
+    enabled: true
+    admin-email: admin@nerd.local
+    admin-password: Admin123!
+    tenant-name: Test Tenant
+    tenant-slug: test-tenant
+
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true
+
+nerd.security.jwt.secret: test-secret-key-at-least-256-bits-long-for-hmac-sha256!!

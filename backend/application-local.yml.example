@@ -1,0 +1,17 @@
+# Copier vers application-local.yml (non versionné) :
+#   cp application-local.yml.example application-local.yml
+#
+# Clé : https://aistudio.google.com/apikey
+
+nerd:
+  gemini:
+    api-key: COLLEZ_VOTRE_CLE_ICI
+  # Sync dashboard Nerd-Forge — app Etsy + token OAuth (scope transactions_r pour les commandes)
+  # Shop ID : URL boutique ou GET /v3/application/users/me/shops
+  etsy:
+    api-key: VOTRE_KEYSTRING
+    shared-secret: VOTRE_SHARED_SECRET
+    # ou une seule ligne : api-key: "keystring:shared_secret"
+    access-token: VOTRE_ACCESS_TOKEN_OAUTH
+    refresh-token: VOTRE_REFRESH_TOKEN_OAUTH
+    shop-id: 12345678

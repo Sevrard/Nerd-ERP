@@ -1,0 +1,62 @@
+spring:
+  application:
+    name: nerd-erp
+  config:
+    import: optional:file:./application-local.yml
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/nerd_erp}
+    username: ${DATABASE_USERNAME:nerd_erp}
+    password: ${DATABASE_PASSWORD:nerd_erp}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 12MB
+
+server:
+  port: ${SERVER_PORT:8080}
+
+nerd:
+  gemini:
+    api-key: ${GEMINI_API_KEY:}
+    model: ${GEMINI_MODEL:gemini-2.5-flash}
+    enabled: ${GEMINI_ENABLED:true}
+  security:
+    jwt:
+      secret: ${JWT_SECRET:change-me-in-production-use-at-least-256-bits-secret-key!!}
+      expiration-ms: ${JWT_EXPIRATION_MS:86400000}
+  storage:
+    invoice-documents: ${INVOICE_DOCUMENTS_DIR:data/invoice-documents}
+  etsy:
+    api-key: ${ETSY_API_KEY:}
+    shared-secret: ${ETSY_SHARED_SECRET:}
+    access-token: ${ETSY_ACCESS_TOKEN:}
+    refresh-token: ${ETSY_REFRESH_TOKEN:}
+    shop-id: ${ETSY_SHOP_ID:0}
+    enabled: ${ETSY_ENABLED:true}
+  bootstrap:
+    enabled: ${BOOTSTRAP_ENABLED:true}
+    admin-email: ${BOOTSTRAP_ADMIN_EMAIL:admin@nerd.local}
+    admin-password: ${BOOTSTRAP_ADMIN_PASSWORD:Admin123!}
+    tenant-name: ${BOOTSTRAP_TENANT_NAME:Nerd Group}
+    tenant-slug: ${BOOTSTRAP_TENANT_SLUG:nerd-group}
+
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+logging:
+  level:
+    org.springframework.security: INFO
