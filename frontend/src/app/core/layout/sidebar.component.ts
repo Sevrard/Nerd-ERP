@@ -2,6 +2,7 @@ import { Component, inject, signal } from '@angular/core';
 import { LayoutUiService } from './layout-ui.service';
 import { RouterLink, RouterLinkActive } from '@angular/router';
 import { WorkspaceService } from '../workspace/workspace.service';
+import { Workspace, WorkspaceUpdatePayload } from '../../shared/models/workspace.model';
 import { AuthService } from '../auth/auth.service';
 import { workspaceUi } from '../workspace/workspace-ui.config';
 import { SidebarNavModulesService } from './sidebar-nav-modules.service';
@@ -86,6 +87,17 @@ import { apiErrorMessage } from '../../shared/utils/api-error.util';
                 <span class="h-2 w-2 shrink-0 rounded-full" [class]="ui(ws).dotClass"></span>
                 <span class="truncate">{{ ws.name }}</span>
               </button>
+              @if (auth.canAdminister()) {
+                <button
+                  type="button"
+                  class="inline-flex size-8 shrink-0 items-center justify-center rounded-md text-slate-500 transition hover:bg-slate-700 hover:text-cyan-400"
+                  [attr.aria-label]="'Paramètres émetteur — ' + ws.name"
+                  [disabled]="workspaceBusy()"
+                  (click)="openEditWorkspace(ws); $event.stopPropagation()"
+                >
+                  <app-lucide-icon name="settings" [size]="15" />
+                </button>
+              }
               @if (auth.canAdminister() && workspaceManageMode() && workspaces.workspaces().length > 1) {
                 <button
                   type="button"
@@ -175,6 +187,226 @@ import { apiErrorMessage } from '../../shared/utils/api-error.util';
       </div>
     </aside>
 
+    @if (editOpen()) {
+      <div
+        class="fixed inset-0 z-[70] flex items-center justify-center overflow-y-auto bg-black/80 p-4"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="edit-ws-title"
+      >
+        <form
+          class="my-4 w-full max-w-lg rounded-xl border border-slate-700 bg-[#0B0E11] p-5 shadow-xl"
+          (ngSubmit)="submitEditWorkspace()"
+        >
+          <h2 id="edit-ws-title" class="text-lg font-semibold text-white">Prestataire / émetteur</h2>
+          <p class="mt-1 text-sm text-slate-400">
+            Coordonnées affichées sur les devis et factures — {{ editSlug() }}
+          </p>
+
+          <div class="mt-4 space-y-3">
+            <label class="block text-sm text-slate-300">
+              Raison sociale / nom commercial
+              <input
+                type="text"
+                required
+                maxlength="255"
+                class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white"
+                [(ngModel)]="editForm.name"
+                name="editName"
+                [disabled]="workspaceBusy()"
+              />
+            </label>
+            <label class="block text-sm text-slate-300">
+              Activité / sous-titre
+              <input
+                type="text"
+                maxlength="255"
+                placeholder="Ingénierie &amp; solutions digitales"
+                class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white"
+                [(ngModel)]="editForm.legalSubtitle"
+                name="editSubtitle"
+                [disabled]="workspaceBusy()"
+              />
+            </label>
+          </div>
+
+          <p class="mt-4 text-xs font-semibold uppercase tracking-wider text-cyan-500/90">Adresse</p>
+          <div class="mt-2 space-y-3">
+            <input
+              type="text"
+              maxlength="255"
+              placeholder="Ligne d'adresse 1"
+              class="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white"
+              [(ngModel)]="editForm.addressLine1"
+              name="editAddr1"
+              [disabled]="workspaceBusy()"
+            />
+            <input
+              type="text"
+              maxlength="255"
+              placeholder="Complément (optionnel)"
+              class="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white"
+              [(ngModel)]="editForm.addressLine2"
+              name="editAddr2"
+              [disabled]="workspaceBusy()"
+            />
+            <div class="grid grid-cols-2 gap-3">
+              <input
+                type="text"
+                maxlength="20"
+                placeholder="Code postal"
+                class="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white"
+                [(ngModel)]="editForm.postalCode"
+                name="editCp"
+                [disabled]="workspaceBusy()"
+              />
+              <input
+                type="text"
+                maxlength="120"
+                placeholder="Ville"
+                class="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white"
+                [(ngModel)]="editForm.city"
+                name="editCity"
+                [disabled]="workspaceBusy()"
+              />
+            </div>
+            <input
+              type="text"
+              maxlength="120"
+              placeholder="Région / département"
+              class="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white"
+              [(ngModel)]="editForm.region"
+              name="editRegion"
+              [disabled]="workspaceBusy()"
+            />
+            <input
+              type="text"
+              maxlength="2"
+              placeholder="FR"
+              class="w-24 rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm uppercase text-white"
+              [(ngModel)]="editForm.countryCode"
+              name="editCountry"
+              [disabled]="workspaceBusy()"
+            />
+          </div>
+
+          <p class="mt-4 text-xs font-semibold uppercase tracking-wider text-cyan-500/90">Contact</p>
+          <div class="mt-2 grid gap-3 sm:grid-cols-2">
+            <label class="block text-sm text-slate-300 sm:col-span-2">
+              E-mail
+              <input
+                type="email"
+                maxlength="255"
+                class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white"
+                [(ngModel)]="editForm.contactEmail"
+                name="editEmail"
+                [disabled]="workspaceBusy()"
+              />
+            </label>
+            <label class="block text-sm text-slate-300 sm:col-span-2">
+              Site web
+              <input
+                type="url"
+                maxlength="512"
+                placeholder="https://…"
+                class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white"
+                [(ngModel)]="editForm.websiteUrl"
+                name="editWeb"
+                [disabled]="workspaceBusy()"
+              />
+            </label>
+          </div>
+
+          <p class="mt-4 text-xs font-semibold uppercase tracking-wider text-cyan-500/90">Identifiants légaux</p>
+          <div class="mt-2 grid gap-3 sm:grid-cols-2">
+            <label class="block text-sm text-slate-300">
+              SIREN
+              <input
+                type="text"
+                maxlength="20"
+                class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 font-mono text-sm text-white"
+                [(ngModel)]="editForm.siren"
+                name="editSiren"
+                [disabled]="workspaceBusy()"
+              />
+            </label>
+            <label class="block text-sm text-slate-300">
+              N° TVA intracom.
+              <input
+                type="text"
+                maxlength="32"
+                class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 font-mono text-sm text-white"
+                [(ngModel)]="editForm.vatNumber"
+                name="editVat"
+                [disabled]="workspaceBusy()"
+              />
+            </label>
+          </div>
+
+          <p class="mt-4 text-xs font-semibold uppercase tracking-wider text-cyan-500/90">Numérotation documents</p>
+          <div class="mt-2 grid gap-3 sm:grid-cols-3">
+            <label class="block text-sm text-slate-300">
+              Devise
+              <input
+                type="text"
+                required
+                maxlength="3"
+                class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 font-mono text-sm uppercase text-white"
+                [(ngModel)]="editForm.currencyCode"
+                name="editCurrency"
+                [disabled]="workspaceBusy()"
+              />
+            </label>
+            <label class="block text-sm text-slate-300">
+              Préfixe devis
+              <input
+                type="text"
+                required
+                maxlength="20"
+                class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 font-mono text-sm text-white"
+                [(ngModel)]="editForm.quotationPrefix"
+                name="editQPrefix"
+                [disabled]="workspaceBusy()"
+              />
+            </label>
+            <label class="block text-sm text-slate-300">
+              Préfixe facture
+              <input
+                type="text"
+                required
+                maxlength="20"
+                class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 font-mono text-sm text-white"
+                [(ngModel)]="editForm.invoicePrefix"
+                name="editIPrefix"
+                [disabled]="workspaceBusy()"
+              />
+            </label>
+          </div>
+
+          @if (editError()) {
+            <p class="mt-3 text-sm text-red-400">{{ editError() }}</p>
+          }
+          <div class="mt-5 flex justify-end gap-2">
+            <button
+              type="button"
+              class="rounded-lg px-4 py-2 text-sm text-slate-400 hover:text-white"
+              [disabled]="workspaceBusy()"
+              (click)="closeEditWorkspace()"
+            >
+              Annuler
+            </button>
+            <button
+              type="submit"
+              class="rounded-lg bg-cyan-600 px-4 py-2 text-sm font-medium text-white hover:bg-cyan-500 disabled:opacity-50"
+              [disabled]="workspaceBusy() || !editForm.name.trim()"
+            >
+              Enregistrer
+            </button>
+          </div>
+        </form>
+      </div>
+    }
+
     @if (createOpen()) {
       <div
         class="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 p-4"
@@ -245,10 +477,35 @@ export class SidebarComponent {
 
   readonly workspaceManageMode = signal(false);
   readonly createOpen = signal(false);
+  readonly editOpen = signal(false);
+  readonly editWorkspaceId = signal<string | null>(null);
+  readonly editSlug = signal('');
   readonly workspaceBusy = signal(false);
   readonly createError = signal<string | null>(null);
+  readonly editError = signal<string | null>(null);
   createName = '';
   createSlug = '';
+  editForm: WorkspaceUpdatePayload = this.emptyEditForm();
+
+  private emptyEditForm(): WorkspaceUpdatePayload {
+    return {
+      name: '',
+      legalSubtitle: '',
+      addressLine1: '',
+      addressLine2: '',
+      postalCode: '',
+      city: '',
+      region: '',
+      countryCode: 'FR',
+      contactEmail: '',
+      websiteUrl: '',
+      siren: '',
+      vatNumber: '',
+      currencyCode: 'EUR',
+      invoicePrefix: 'FAC',
+      quotationPrefix: 'DEV',
+    };
+  }
 
   ui(ws: { slug: string; name: string }) {
     return workspaceUi(ws.slug, ws.name);
@@ -257,6 +514,78 @@ export class SidebarComponent {
   select(id: string): void {
     this.workspaces.selectWorkspace(id);
     this.layout.closeMobileSidebar();
+  }
+
+  openEditWorkspace(ws: Workspace): void {
+    this.editWorkspaceId.set(ws.id);
+    this.editSlug.set(ws.slug);
+    this.editError.set(null);
+    this.editForm = {
+      name: ws.name,
+      legalSubtitle: ws.legalSubtitle ?? '',
+      addressLine1: ws.addressLine1 ?? '',
+      addressLine2: ws.addressLine2 ?? '',
+      postalCode: ws.postalCode ?? '',
+      city: ws.city ?? '',
+      region: ws.region ?? '',
+      countryCode: ws.countryCode || 'FR',
+      contactEmail: ws.contactEmail ?? '',
+      websiteUrl: ws.websiteUrl ?? '',
+      siren: ws.siren ?? '',
+      vatNumber: ws.vatNumber ?? '',
+      currencyCode: ws.currencyCode || 'EUR',
+      invoicePrefix: ws.invoicePrefix || 'FAC',
+      quotationPrefix: ws.quotationPrefix || 'DEV',
+    };
+    this.editOpen.set(true);
+  }
+
+  closeEditWorkspace(): void {
+    if (this.workspaceBusy()) {
+      return;
+    }
+    this.editOpen.set(false);
+    this.editWorkspaceId.set(null);
+  }
+
+  submitEditWorkspace(): void {
+    const id = this.editWorkspaceId();
+    if (!id || this.workspaceBusy() || !this.editForm.name.trim()) {
+      return;
+    }
+    const payload: WorkspaceUpdatePayload = {
+      name: this.editForm.name.trim(),
+      legalSubtitle: this.nullIfBlank(this.editForm.legalSubtitle),
+      addressLine1: this.nullIfBlank(this.editForm.addressLine1),
+      addressLine2: this.nullIfBlank(this.editForm.addressLine2),
+      postalCode: this.nullIfBlank(this.editForm.postalCode),
+      city: this.nullIfBlank(this.editForm.city),
+      region: this.nullIfBlank(this.editForm.region),
+      countryCode: (this.editForm.countryCode || 'FR').trim().toUpperCase(),
+      contactEmail: this.nullIfBlank(this.editForm.contactEmail),
+      websiteUrl: this.nullIfBlank(this.editForm.websiteUrl),
+      siren: this.nullIfBlank(this.editForm.siren),
+      vatNumber: this.nullIfBlank(this.editForm.vatNumber),
+      currencyCode: this.editForm.currencyCode.trim().toUpperCase(),
+      invoicePrefix: this.editForm.invoicePrefix.trim(),
+      quotationPrefix: this.editForm.quotationPrefix.trim(),
+    };
+    this.workspaceBusy.set(true);
+    this.editError.set(null);
+    this.workspaces
+      .updateWorkspace(id, payload)
+      .pipe(finalize(() => this.workspaceBusy.set(false)))
+      .subscribe({
+        next: () => this.editOpen.set(false),
+        error: (err) => {
+          this.editError.set(apiErrorMessage(err, 'Mise à jour impossible'));
+        },
+      });
+  }
+
+  private nullIfBlank(value: string | null | undefined): string | null {
+    const t = value?.trim();
+    return t ? t : null;
   }
 
   openCreateWorkspace(): void {

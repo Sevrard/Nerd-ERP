@@ -37,6 +37,39 @@ public class Workspace extends TenantScopedEntity {
     @Column(name = "quotation_prefix", nullable = false, length = 20)
     private String quotationPrefix = "DEV";
 
+    @Column(name = "legal_subtitle", length = 255)
+    private String legalSubtitle;
+
+    @Column(name = "address_line1", length = 255)
+    private String addressLine1;
+
+    @Column(name = "address_line2", length = 255)
+    private String addressLine2;
+
+    @Column(name = "postal_code", length = 20)
+    private String postalCode;
+
+    @Column(length = 120)
+    private String city;
+
+    @Column(length = 120)
+    private String region;
+
+    @Column(name = "country_code", nullable = false, length = 2)
+    private String countryCode = "FR";
+
+    @Column(name = "contact_email", length = 255)
+    private String contactEmail;
+
+    @Column(name = "website_url", length = 512)
+    private String websiteUrl;
+
+    @Column(length = 20)
+    private String siren;
+
+    @Column(name = "vat_number", length = 32)
+    private String vatNumber;
+
     @Column(nullable = false)
     private boolean active = true;
 }

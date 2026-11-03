@@ -1,0 +1,807 @@
+<div class="-mx-2 space-y-6 pb-10 sm:-mx-0">
+  <!-- En-tête catalogue -->
+  <div class="flex flex-wrap items-start justify-between gap-4 border-b border-slate-800/80 pb-5">
+    <div class="flex items-start gap-3">
+      <div
+        class="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-tr from-cyan-500 to-indigo-600 shadow-lg shadow-cyan-500/20"
+      >
+        <app-lucide-icon name="package" [size]="20" class="text-white" />
+      </div>
+      <div>
+        <div class="flex flex-wrap items-center gap-2">
+          <h1 class="text-lg font-bold tracking-tight text-white">Catalogue prestations</h1>
+          <span
+            class="rounded border border-cyan-500/20 bg-cyan-500/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-cyan-400"
+            >ERP</span
+          >
+        </div>
+        <p class="text-xs text-slate-400">Prestations, catégories & packages groupés</p>
+      </div>
+    </div>
+
+    <div class="flex flex-wrap items-center gap-2">
+      <button
+        type="button"
+        class="inline-flex items-center gap-2 rounded-lg border border-purple-500/30 bg-purple-500/10 px-3 py-2 text-sm font-medium text-purple-300 transition hover:bg-purple-500/20"
+        (click)="openPackageModal()"
+      >
+        <app-lucide-icon name="boxes" [size]="16" class="text-purple-400" />
+        + Package
+      </button>
+      <button
+        type="button"
+        class="inline-flex items-center gap-2 rounded-lg border border-slate-700/60 bg-slate-800 px-3 py-2 text-sm font-medium text-slate-200 transition hover:bg-slate-700"
+        (click)="openNewCategoryModal(); setTab('categories')"
+      >
+        <app-lucide-icon name="tag" [size]="16" class="text-purple-400" />
+        + Catégorie
+      </button>
+      <a
+        routerLink="/products/new"
+        class="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-emerald-500 to-teal-600 px-4 py-2 text-sm font-semibold text-slate-950 shadow-lg shadow-emerald-500/20 transition hover:from-emerald-400 hover:to-teal-500"
+      >
+        <app-lucide-icon name="plus" [size]="16" />
+        Nouveau produit
+      </a>
+    </div>
+  </div>
+
+  @if (error()) {
+    <app-error-banner [message]="error()!" />
+  }
+
+  <!-- KPI -->
+  <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <div class="flex items-center gap-4 rounded-xl border border-slate-800 bg-slate-900/70 p-4">
+      <div class="rounded-lg border border-cyan-500/20 bg-cyan-500/10 p-3 text-cyan-400">
+        <app-lucide-icon name="package" [size]="24" />
+      </div>
+      <div>
+        <p class="text-xs font-medium text-slate-400">Total prestations</p>
+        <p class="text-2xl font-bold tracking-tight text-white">{{ stats().totalProds }}</p>
+      </div>
+    </div>
+    <div class="flex items-center gap-4 rounded-xl border border-slate-800 bg-slate-900/70 p-4">
+      <div class="rounded-lg border border-purple-500/20 bg-purple-500/10 p-3 text-purple-400">
+        <app-lucide-icon name="boxes" [size]="24" />
+      </div>
+      <div>
+        <p class="text-xs font-medium text-slate-400">Packages / packs</p>
+        <p class="text-2xl font-bold tracking-tight text-white">{{ stats().totalPkgs }}</p>
+      </div>
+    </div>
+    <div class="flex items-center gap-4 rounded-xl border border-slate-800 bg-slate-900/70 p-4">
+      <div class="rounded-lg border border-emerald-500/20 bg-emerald-500/10 p-3 text-emerald-400">
+        <app-lucide-icon name="clock" [size]="24" />
+      </div>
+      <div>
+        <p class="text-xs font-medium text-slate-400">TJM moyen (régie)</p>
+        <p class="text-2xl font-bold tracking-tight text-white">
+          {{ stats().avgTjm }} € <span class="text-xs font-normal text-slate-400">/ jour</span>
+        </p>
+      </div>
+    </div>
+    <div class="flex items-center gap-4 rounded-xl border border-slate-800 bg-slate-900/70 p-4">
+      <div class="rounded-lg border border-amber-500/20 bg-amber-500/10 p-3 text-amber-400">
+        <app-lucide-icon name="euro" [size]="24" />
+      </div>
+      <div>
+        <p class="text-xs font-medium text-slate-400">Valeur cumulée catalogue</p>
+        <p class="text-2xl font-bold tracking-tight text-white">
+          {{ stats().totalCatalogValue.toLocaleString('fr-FR') }} €
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Onglets -->
+  <div class="flex border-b border-slate-800 text-sm font-medium">
+    <button
+      type="button"
+      class="flex items-center gap-2 border-b-2 px-4 pb-3 transition"
+      [class.border-cyan-400]="activeTab() === 'products'"
+      [class.font-semibold]="activeTab() === 'products'"
+      [class.text-cyan-400]="activeTab() === 'products'"
+      [class.border-transparent]="activeTab() !== 'products'"
+      [class.text-slate-400]="activeTab() !== 'products'"
+      (click)="setTab('products')"
+    >
+      <app-lucide-icon name="package" [size]="16" />
+      Produits & prestations
+      <span class="ml-1.5 rounded-full bg-slate-800 px-2 py-0.5 text-xs text-slate-300">{{
+        filteredProducts().length
+      }}</span>
+    </button>
+    <button
+      type="button"
+      class="flex items-center gap-2 border-b-2 px-4 pb-3 transition"
+      [class.border-cyan-400]="activeTab() === 'categories'"
+      [class.font-semibold]="activeTab() === 'categories'"
+      [class.text-cyan-400]="activeTab() === 'categories'"
+      [class.border-transparent]="activeTab() !== 'categories'"
+      [class.text-slate-400]="activeTab() !== 'categories'"
+      (click)="setTab('categories')"
+    >
+      <app-lucide-icon name="layers" [size]="16" />
+      Gestionnaire de catégories
+      <span class="ml-1.5 rounded-full bg-slate-800 px-2 py-0.5 text-xs text-slate-300">{{ categories().length }}</span>
+    </button>
+    <button
+      type="button"
+      class="flex items-center gap-2 border-b-2 px-4 pb-3 transition"
+      [class.border-purple-400]="activeTab() === 'packages'"
+      [class.font-semibold]="activeTab() === 'packages'"
+      [class.text-purple-400]="activeTab() === 'packages'"
+      [class.border-transparent]="activeTab() !== 'packages'"
+      [class.text-slate-400]="activeTab() !== 'packages'"
+      (click)="setTab('packages')"
+    >
+      <app-lucide-icon name="boxes" [size]="16" class="text-purple-400" />
+      Gestion des packages
+      <span class="ml-1.5 rounded-full bg-purple-500/20 px-2 py-0.5 text-xs text-purple-300">{{ packages().length }}</span>
+    </button>
+  </div>
+
+  @if (activeTab() === 'products') {
+    <div class="space-y-4">
+      <div
+        class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-800 bg-slate-900/90 p-3"
+      >
+        <div class="flex min-w-[280px] flex-1 flex-wrap items-center gap-3">
+          <div class="relative w-full max-w-md">
+            <app-lucide-icon
+              name="search"
+              [size]="16"
+              class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"
+            />
+            <input
+              type="search"
+              [value]="filterQ()"
+              (input)="onSearchInput($any($event.target).value)"
+              placeholder="Rechercher une prestation, réf. SKU…"
+              class="w-full rounded-lg border border-slate-800 bg-slate-950 py-2 pl-9 pr-9 text-sm text-slate-200 placeholder-slate-500 transition focus:border-cyan-500/60 focus:outline-none focus:ring-1 focus:ring-cyan-500/60"
+            />
+            @if (filterQ()) {
+              <button
+                type="button"
+                class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+                (click)="clearSearch()"
+              >
+                <app-lucide-icon name="x" [size]="14" />
+              </button>
+            }
+          </div>
+          <div class="flex items-center gap-2">
+            <app-lucide-icon name="filter" [size]="16" class="hidden text-slate-500 sm:block" />
+            <select
+              [value]="filterCategoryId()"
+              (change)="onCategoryFilterChange($any($event.target).value)"
+              class="rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-300 focus:border-cyan-500/60 focus:outline-none"
+            >
+              <option value="">Toutes les catégories</option>
+              @for (c of categories(); track c.id) {
+                <option [value]="c.id">{{ c.label }}</option>
+              }
+            </select>
+          </div>
+        </div>
+        <label
+          class="flex cursor-pointer select-none items-center gap-2 border-l border-slate-800 pl-4 text-xs font-medium text-slate-400"
+        >
+          <input
+            type="checkbox"
+            [checked]="filterActiveOnly()"
+            (change)="onActiveOnlyChange($any($event.target).checked)"
+            class="h-4 w-4 rounded border-slate-700 bg-slate-950 text-cyan-500 focus:ring-cyan-500/30"
+          />
+          Actifs seulement
+        </label>
+      </div>
+
+      @if (loading()) {
+        <app-loading-state />
+      } @else if (!filteredProducts().length) {
+        <app-empty-state title="Aucune prestation trouvée." />
+      } @else {
+        <div class="overflow-hidden rounded-xl border border-slate-800/80 bg-slate-900/60 shadow-xl">
+          <div class="overflow-x-auto">
+            <table class="w-full border-collapse text-left">
+              <thead>
+                <tr class="border-b border-slate-800 bg-slate-900/90 text-[11px] font-semibold text-slate-400">
+                  <th
+                    appSortableTh
+                    class="w-32"
+                    label="Réf. (SKU)"
+                    columnKey="referenceCode"
+                    [sortKey]="productSortKey()"
+                    [sortDir]="productSortDir()"
+                    (columnSort)="onProductSort($event)"
+                  ></th>
+                  <th
+                    appSortableTh
+                    label="Nom & description"
+                    columnKey="name"
+                    [sortKey]="productSortKey()"
+                    [sortDir]="productSortDir()"
+                    (columnSort)="onProductSort($event)"
+                  ></th>
+                  <th
+                    appSortableTh
+                    label="Catégorie"
+                    columnKey="category"
+                    [sortKey]="productSortKey()"
+                    [sortDir]="productSortDir()"
+                    (columnSort)="onProductSort($event)"
+                  ></th>
+                  <th class="px-4 py-3.5 uppercase tracking-wider">Mode de tarif</th>
+                  <th
+                    appSortableTh
+                    label="Prix HT"
+                    columnKey="price"
+                    align="right"
+                    [sortKey]="productSortKey()"
+                    [sortDir]="productSortDir()"
+                    (columnSort)="onProductSort($event)"
+                  ></th>
+                  <th
+                    appSortableTh
+                    label="TVA"
+                    columnKey="vat"
+                    align="center"
+                    [sortKey]="productSortKey()"
+                    [sortDir]="productSortDir()"
+                    (columnSort)="onProductSort($event)"
+                  ></th>
+                  <th class="w-36 px-4 py-3.5 text-right uppercase tracking-wider">Actions</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-800/60 text-sm">
+                @for (p of sortedFilteredProducts(); track p.id) {
+                  @let cat = categoryById(p.categoryId);
+                  @let color = categoryColor(cat);
+                  @let bill = billing(p);
+                  @let editing = editingProductId() === p.id;
+                  @let draft = productEditDraft();
+                  <tr class="group transition hover:bg-slate-800/40" [class.bg-cyan-950/20]="editing">
+                    <td class="px-4 py-3.5 font-mono text-xs font-semibold text-slate-400 transition group-hover:text-cyan-400">
+                      {{ p.referenceCode }}
+                    </td>
+                    <td class="px-4 py-3.5">
+                      @if (editing && draft) {
+                        <input
+                          [value]="draft.name"
+                          (input)="patchProductDraft({ name: $any($event.target).value })"
+                          class="w-full rounded border border-cyan-500/50 bg-slate-950 px-2 py-1 text-sm font-semibold text-white"
+                        />
+                      } @else {
+                        <div class="font-semibold text-slate-200 transition group-hover:text-white">{{ p.name }}</div>
+                        @if (shortDescription(p)) {
+                          <div class="mt-0.5 line-clamp-1 text-xs text-slate-500">{{ shortDescription(p) }}</div>
+                        }
+                      }
+                    </td>
+                    <td class="px-4 py-3.5">
+                      @if (editing && draft) {
+                        <select
+                          [value]="draft.categoryId"
+                          (change)="patchProductDraft({ categoryId: $any($event.target).value })"
+                          class="w-full rounded border border-cyan-500/50 bg-slate-950 px-2 py-1 text-xs text-white"
+                        >
+                          <option value="">Non catégorisé</option>
+                          @for (c of categories(); track c.id) {
+                            <option [value]="c.id">{{ c.label }}</option>
+                          }
+                        </select>
+                      } @else {
+                        <span
+                          class="inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium"
+                          [class]="color.bg + ' ' + color.text + ' ' + color.border"
+                        >
+                          <span class="h-1.5 w-1.5 rounded-full" [style.background-color]="color.hex"></span>
+                          {{ cat?.label ?? p.categoryLabel ?? 'Non catégorisé' }}
+                        </span>
+                      }
+                    </td>
+                    <td class="px-4 py-3.5">
+                      @if (editing && draft) {
+                        <select
+                          [value]="draft.billingType"
+                          (change)="patchProductDraft({ billingType: $any($event.target).value })"
+                          class="w-full min-w-[140px] rounded border border-cyan-500/50 bg-slate-950 px-2 py-1 text-xs text-white"
+                        >
+                          <option value="DAYS">TJM / jour</option>
+                          <option value="FIXED_PRICE">Forfait fixe</option>
+                          <option value="RECURRING">Récurrent</option>
+                        </select>
+                      } @else {
+                        @switch (bill.type) {
+                          @case ('DAYS') {
+                            <span
+                              class="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-0.5 text-xs font-semibold text-emerald-400"
+                            >
+                              <app-lucide-icon name="clock" [size]="12" />
+                              TJM / jour
+                            </span>
+                          }
+                          @case ('FIXED_PRICE') {
+                            <span
+                              class="inline-flex items-center gap-1.5 rounded-full border border-blue-500/20 bg-blue-500/10 px-2.5 py-0.5 text-xs font-semibold text-blue-400"
+                            >
+                              <app-lucide-icon name="zap" [size]="12" />
+                              Forfait fixe
+                            </span>
+                          }
+                          @case ('RECURRING') {
+                            <span
+                              class="inline-flex items-center gap-1.5 rounded-full border border-purple-500/20 bg-purple-500/10 px-2.5 py-0.5 text-xs font-semibold text-purple-400"
+                            >
+                              <app-lucide-icon name="refresh-cw" [size]="12" />
+                              Récurrent
+                            </span>
+                          }
+                          @default {
+                            <span class="text-xs text-slate-500">—</span>
+                          }
+                        }
+                      }
+                    </td>
+                    <td class="px-4 py-3.5 text-right font-mono text-slate-100">
+                      @if (editing && draft) {
+                        <input
+                          type="number"
+                          step="0.01"
+                          [value]="draft.unitPriceHt"
+                          (input)="patchProductDraft({ unitPriceHt: +$any($event.target).value })"
+                          class="w-24 rounded border border-cyan-500/50 bg-slate-950 px-2 py-1 text-right text-sm text-white"
+                        />
+                      } @else {
+                        <span class="font-bold">{{ priceFormatted(p.unitPriceHt) }} €</span>
+                        <span class="ml-1 text-xs font-normal text-slate-500">/ {{ bill.unitLabel }}</span>
+                      }
+                      @if (editing && draft) {
+                        <span class="mt-0.5 block text-[10px] text-slate-500">
+                          / {{ draftBillingUnitLabel(draft.billingType) }}
+                        </span>
+                      }
+                    </td>
+                    <td class="px-4 py-3.5 text-center font-mono text-xs text-slate-400">
+                      @if (editing && draft) {
+                        <input
+                          type="number"
+                          step="0.01"
+                          [value]="draft.vatRate"
+                          (input)="patchProductDraft({ vatRate: +$any($event.target).value })"
+                          class="w-16 rounded border border-cyan-500/50 bg-slate-950 px-2 py-1 text-center text-white"
+                        />
+                      } @else {
+                        {{ p.vatRate }}%
+                      }
+                    </td>
+                    <td class="px-4 py-3.5 text-right">
+                      <div class="flex items-center justify-end gap-0.5 opacity-90 group-hover:opacity-100">
+                        @if (editing) {
+                          <app-icon-action
+                            icon="check"
+                            label="Enregistrer"
+                            variant="brand"
+                            [loading]="savingProductId() === p.id"
+                            (action)="saveProductInlineEdit(p)"
+                          />
+                          <app-icon-action icon="x" label="Annuler" (action)="cancelProductInlineEdit()" />
+                        } @else {
+                          <app-icon-action
+                            icon="copy"
+                            label="Dupliquer"
+                            [loading]="duplicatingId() === p.id"
+                            (action)="duplicateProduct(p)"
+                          />
+                          <app-icon-action
+                            icon="pencil"
+                            label="Modifier inline"
+                            variant="brand"
+                            (action)="startProductInlineEdit(p)"
+                          />
+                          <app-icon-action
+                            icon="external-link"
+                            label="Fiche complète"
+                            [link]="['/products', p.id, 'edit']"
+                          />
+                          <app-icon-action
+                            icon="trash"
+                            label="Supprimer"
+                            variant="danger"
+                            [loading]="deletingId() === p.id"
+                            (action)="confirmDelete(p)"
+                          />
+                        }
+                      </div>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </div>
+      }
+    </div>
+  }
+
+  @if (activeTab() === 'categories') {
+    <div class="space-y-4">
+      <div
+        class="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-slate-800 bg-slate-900/90 p-4"
+      >
+        <div>
+          <h2 class="flex items-center gap-2 text-base font-bold text-white">
+            <app-lucide-icon name="palette" [size]="20" class="text-cyan-400" />
+            Gestionnaire des catégories
+          </h2>
+          <p class="mt-0.5 text-xs text-slate-400">
+            Modifiez le libellé ou la couleur d’accentuation (stockée localement sur ce navigateur).
+          </p>
+        </div>
+        <button
+          type="button"
+          class="inline-flex items-center gap-2 rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-3.5 py-2 text-sm font-semibold text-cyan-400 transition hover:bg-cyan-500/20"
+          (click)="openNewCategoryModal()"
+        >
+          <app-lucide-icon name="plus" [size]="16" />
+          Ajouter une catégorie
+        </button>
+      </div>
+
+      @if (loading() && !categories().length) {
+        <app-loading-state />
+      } @else if (!categories().length) {
+        <app-empty-state title="Aucune catégorie." />
+      } @else {
+        <div class="overflow-hidden rounded-xl border border-slate-800 bg-slate-900/60 shadow-xl">
+          <table class="w-full border-collapse text-left">
+            <thead>
+              <tr class="border-b border-slate-800 bg-slate-900/90 text-[11px] font-semibold text-slate-400">
+                <th
+                  appSortableTh
+                  class="w-40"
+                  label="Code"
+                  columnKey="code"
+                  [sortKey]="categorySortKey()"
+                  [sortDir]="categorySortDir()"
+                  (columnSort)="onCategorySort($event)"
+                ></th>
+                <th
+                  appSortableTh
+                  label="Nom de la catégorie"
+                  columnKey="label"
+                  [sortKey]="categorySortKey()"
+                  [sortDir]="categorySortDir()"
+                  (columnSort)="onCategorySort($event)"
+                ></th>
+                <th class="px-4 py-3.5 uppercase tracking-wider">Couleur</th>
+                <th
+                  appSortableTh
+                  label="Produits"
+                  columnKey="products"
+                  align="center"
+                  [sortKey]="categorySortKey()"
+                  [sortDir]="categorySortDir()"
+                  (columnSort)="onCategorySort($event)"
+                ></th>
+                <th class="w-28 px-4 py-3.5 text-right uppercase tracking-wider">Actions</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-800/60 text-sm">
+              @for (cat of sortedCategories(); track cat.id) {
+                @let color = categoryColor(cat);
+                <tr class="transition hover:bg-slate-800/40" [class.bg-cyan-950/20]="editingCatId() === cat.id">
+                  <td class="px-4 py-3.5">
+                    @if (editingCatId() === cat.id) {
+                      <input
+                        type="text"
+                        [value]="inlineCatCode()"
+                        (input)="inlineCatCode.set($any($event.target).value)"
+                        class="w-full rounded border border-cyan-500 bg-slate-950 px-2 py-1 font-mono text-xs text-white"
+                      />
+                    } @else {
+                      <span class="font-mono text-xs font-semibold text-slate-400">{{ cat.code }}</span>
+                    }
+                  </td>
+                  <td class="px-4 py-3.5">
+                    @if (editingCatId() === cat.id) {
+                      <div class="flex flex-wrap items-center gap-2">
+                        <input
+                          type="text"
+                          [value]="inlineCatLabel()"
+                          (input)="inlineCatLabel.set($any($event.target).value)"
+                          class="min-w-[160px] flex-1 rounded border border-cyan-500 bg-slate-950 px-2.5 py-1 text-sm text-white focus:outline-none"
+                        />
+                        <input
+                          type="number"
+                          [value]="inlineCatSortOrder()"
+                          (input)="inlineCatSortOrder.set(+$any($event.target).value)"
+                          title="Ordre"
+                          class="w-16 rounded border border-slate-700 bg-slate-950 px-2 py-1 text-center text-xs text-white"
+                        />
+                        <button
+                          type="button"
+                          class="rounded bg-emerald-500/20 p-1 text-emerald-400 hover:bg-emerald-500/30"
+                          (click)="saveInlineEditCategory(cat)"
+                        >
+                          <app-lucide-icon name="check" [size]="16" />
+                        </button>
+                        <button
+                          type="button"
+                          class="rounded bg-slate-800 p-1 text-slate-400 hover:bg-slate-700"
+                          (click)="cancelInlineEditCategory()"
+                        >
+                          <app-lucide-icon name="x" [size]="16" />
+                        </button>
+                      </div>
+                    } @else {
+                      <div class="flex items-center gap-3">
+                        <span
+                          class="inline-flex items-center gap-1.5 rounded-md border px-3 py-1 text-xs font-semibold"
+                          [class]="color.bg + ' ' + color.text + ' ' + color.border"
+                        >
+                          <span class="h-2 w-2 rounded-full" [style.background-color]="color.hex"></span>
+                          {{ cat.label }}
+                        </span>
+                        <button
+                          type="button"
+                          class="text-slate-500 transition hover:text-cyan-400"
+                          (click)="startInlineEditCategory(cat)"
+                        >
+                          <app-lucide-icon name="pencil" [size]="14" />
+                        </button>
+                      </div>
+                    }
+                  </td>
+                  <td class="px-4 py-3.5">
+                    <div class="flex flex-wrap items-center gap-1.5">
+                      @for (opt of palette; track opt.hex) {
+                        <button
+                          type="button"
+                          [title]="opt.name"
+                          class="flex h-6 w-6 items-center justify-center rounded-full transition"
+                          [class.scale-125]="color.hex === opt.hex"
+                          [class.opacity-70]="color.hex !== opt.hex"
+                          [class.hover:opacity-100]="color.hex !== opt.hex"
+                          [class.ring-2]="color.hex === opt.hex"
+                          [class.ring-white]="color.hex === opt.hex"
+                          [style.background-color]="opt.hex"
+                          (click)="pickCategoryColor(cat.id, opt)"
+                        >
+                          @if (color.hex === opt.hex) {
+                            <app-lucide-icon name="check" [size]="12" class="text-slate-950" />
+                          }
+                        </button>
+                      }
+                    </div>
+                  </td>
+                  <td class="px-4 py-3.5 text-center">
+                    <span
+                      class="inline-block rounded-full bg-slate-800 px-2.5 py-0.5 font-mono text-xs font-semibold text-slate-300"
+                    >
+                      {{ productCountForCategory(cat.id) }} prestations
+                    </span>
+                  </td>
+                  <td class="px-4 py-3.5 text-right">
+                    <app-icon-action
+                      icon="trash"
+                      label="Supprimer"
+                      variant="danger"
+                      [loading]="deletingCategoryId() === cat.id"
+                      (action)="confirmDeleteCategory(cat)"
+                    />
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </div>
+  }
+
+  @if (activeTab() === 'packages') {
+    <div class="space-y-6">
+      <div
+        class="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-purple-500/20 bg-gradient-to-r from-slate-900 via-purple-950/30 to-slate-900 p-5"
+      >
+        <div class="flex items-start gap-4">
+          <div class="rounded-xl border border-purple-500/30 bg-purple-500/20 p-3 text-purple-300">
+            <app-lucide-icon name="boxes" [size]="28" />
+          </div>
+          <div>
+            <h2 class="flex flex-wrap items-center gap-2 text-lg font-bold text-white">
+              Packages & offres groupées
+              <span
+                class="rounded-full border border-purple-500/30 bg-purple-500/20 px-2.5 py-0.5 text-xs font-semibold text-purple-300"
+                >Fast Quote Bundle</span
+              >
+            </h2>
+            <p class="mt-1 max-w-2xl text-xs text-slate-400">
+              Assemblez des prestations avec remise en % ou montant fixe pour les réutiliser rapidement sur vos devis.
+            </p>
+          </div>
+        </div>
+        <button
+          type="button"
+          class="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-purple-500 to-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-purple-500/25 transition hover:from-purple-400 hover:to-indigo-500"
+          (click)="openPackageModal()"
+        >
+          <app-lucide-icon name="plus" [size]="16" />
+          Créer un nouveau package
+        </button>
+      </div>
+
+      @if (packagesLoading()) {
+        <app-loading-state />
+      } @else if (!packages().length) {
+        <app-empty-state title="Aucun package." />
+      } @else {
+        <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          @for (pkg of packages(); track pkg.id) {
+            <div
+              class="group flex flex-col justify-between overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/70 shadow-xl transition hover:border-slate-700/80"
+            >
+              <div>
+                <div class="flex items-start justify-between gap-4 border-b border-slate-800/80 bg-slate-900/90 p-5">
+                  <div>
+                    <div class="mb-1.5 flex flex-wrap items-center gap-2.5">
+                      <span class="rounded bg-slate-800 px-2 py-0.5 font-mono text-xs font-semibold text-slate-400">{{
+                        pkg.referenceCode
+                      }}</span>
+                      <span
+                        class="rounded-full border px-2.5 py-0.5 text-xs font-semibold"
+                        [class]="badgeClasses(pkg.badgeTheme)"
+                      >
+                        {{ pkg.items.length }} prestations incluses
+                      </span>
+                    </div>
+                    <h3 class="text-base font-bold text-white transition group-hover:text-purple-300">{{ pkg.title }}</h3>
+                  </div>
+                  <div class="flex items-center gap-1">
+                    <app-icon-action icon="pencil" label="Éditer" variant="brand" (action)="openPackageModal(pkg)" />
+                    <app-icon-action
+                      icon="trash"
+                      label="Supprimer"
+                      variant="danger"
+                      [loading]="deletingPackageId() === pkg.id"
+                      (action)="confirmDeletePackage(pkg)"
+                    />
+                  </div>
+                </div>
+                @if (pkg.description) {
+                  <p class="px-5 pt-4 text-xs leading-relaxed text-slate-400">{{ pkg.description }}</p>
+                }
+                <div class="space-y-2 p-5">
+                  <div class="mb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                    Composition du pack :
+                  </div>
+                  <div class="max-h-48 space-y-1.5 overflow-y-auto pr-1">
+                    @for (item of pkg.items; track item.productId) {
+                      <div
+                        class="flex items-center justify-between rounded-lg border border-slate-800/50 bg-slate-950/60 px-3 py-2 text-xs"
+                      >
+                        <div class="flex min-w-0 items-center gap-2.5">
+                          <app-lucide-icon name="circle-check" [size]="14" class="shrink-0 text-purple-400" />
+                          <span class="truncate font-medium text-slate-200">{{ item.productName }}</span>
+                        </div>
+                        <div class="flex shrink-0 items-center gap-3">
+                          <span class="font-mono font-medium text-slate-400"
+                            >{{ item.quantity }} {{ item.unitLabel }}</span
+                          >
+                          <span class="font-mono font-semibold text-slate-300">{{ item.lineTotalHt.toFixed(0) }} €</span>
+                        </div>
+                      </div>
+                    }
+                  </div>
+                </div>
+              </div>
+              <div class="flex items-center justify-between border-t border-slate-800/80 bg-slate-950/80 p-4">
+                <div>
+                  <div class="flex flex-wrap items-center gap-2 text-xs text-slate-400">
+                    <span>Total brut :</span>
+                    <span class="font-mono text-slate-500 line-through">{{ pkg.grossTotalHt.toFixed(0) }} € HT</span>
+                    @if (pkg.discountAmountHt > 0) {
+                      <span
+                        class="rounded border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-semibold text-emerald-400"
+                      >
+                        @if (pkg.discountType === 'PERCENT') {
+                          -{{ pkg.discountValue }}%
+                        } @else {
+                          -{{ pkg.discountValue }} €
+                        }
+                        ({{ pkg.discountAmountHt.toFixed(0) }} € d'économie)
+                      </span>
+                    }
+                  </div>
+                  <div class="text-xs text-slate-400">Prix pack net HT</div>
+                </div>
+                <div class="text-right font-mono text-xl font-bold tracking-tight text-white">
+                  {{ pkg.netTotalHt.toFixed(2) }} € <span class="text-xs font-normal text-slate-400">HT</span>
+                </div>
+              </div>
+            </div>
+          }
+        </div>
+      }
+    </div>
+  }
+</div>
+
+@if (showCategoryModal()) {
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm">
+    <div class="w-full max-w-md overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl">
+      <div class="flex items-center justify-between border-b border-slate-800 px-6 py-4">
+        <h3 class="flex items-center gap-2 text-lg font-bold text-white">
+          <app-lucide-icon name="tag" [size]="20" class="text-purple-400" />
+          Nouvelle catégorie
+        </h3>
+        <button type="button" class="text-slate-400 transition hover:text-slate-200" (click)="closeCategoryModal()">
+          <app-lucide-icon name="x" [size]="20" />
+        </button>
+      </div>
+      <form class="space-y-4 p-6" (ngSubmit)="saveCategoryModal()">
+        <div>
+          <label class="mb-1 block text-xs font-medium text-slate-400">Code</label>
+          <input
+            formControlName="code"
+            [formGroup]="categoryForm"
+            class="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-sm text-white focus:border-cyan-500 focus:outline-none"
+          />
+        </div>
+        <div>
+          <label class="mb-1 block text-xs font-medium text-slate-400">Nom de la catégorie</label>
+          <input
+            formControlName="label"
+            [formGroup]="categoryForm"
+            class="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-white focus:border-cyan-500 focus:outline-none"
+          />
+        </div>
+        <div>
+          <label class="mb-1 block text-xs font-medium text-slate-400">Ordre d’affichage</label>
+          <input
+            type="number"
+            formControlName="sortOrder"
+            [formGroup]="categoryForm"
+            class="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-white focus:border-cyan-500 focus:outline-none"
+          />
+        </div>
+        <div>
+          <label class="mb-2 block text-xs font-medium text-slate-400">Couleur d’accentuation</label>
+          <div class="grid grid-cols-4 gap-2">
+            @for (c of palette; track c.hex) {
+              <button
+                type="button"
+                class="flex items-center gap-2 rounded-lg border p-2 text-xs transition"
+                [class.border-cyan-400]="categoryModalColorHex() === c.hex"
+                [class.bg-slate-800]="categoryModalColorHex() === c.hex"
+                [class.text-white]="categoryModalColorHex() === c.hex"
+                [class.border-slate-800]="categoryModalColorHex() !== c.hex"
+                [class.bg-slate-950]="categoryModalColorHex() !== c.hex"
+                [class.text-slate-400]="categoryModalColorHex() !== c.hex"
+                (click)="categoryModalColorHex.set(c.hex)"
+              >
+                <span class="h-3 w-3 rounded-full" [style.background-color]="c.hex"></span>
+                {{ c.name }}
+              </button>
+            }
+          </div>
+        </div>
+        <div class="flex items-center justify-end gap-3 border-t border-slate-800 pt-4">
+          <button type="button" class="px-4 py-2 text-sm text-slate-400 hover:text-white" (click)="closeCategoryModal()">
+            Annuler
+          </button>
+          <button
+            type="submit"
+            class="rounded-lg bg-purple-500 px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-purple-500/20 hover:bg-purple-400 disabled:opacity-50"
+            [disabled]="categoryForm.invalid || saving()"
+          >
+            Sauvegarder
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+}

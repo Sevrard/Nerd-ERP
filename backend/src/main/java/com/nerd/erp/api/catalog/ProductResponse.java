@@ -11,6 +11,8 @@ public record ProductResponse(
         String description,
         BigDecimal unitPriceHt,
         BigDecimal vatRate,
-        boolean active
+        boolean active,
+        UUID categoryId,
+        String categoryLabel
 ) {
 }

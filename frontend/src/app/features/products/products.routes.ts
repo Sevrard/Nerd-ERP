@@ -6,6 +6,16 @@ export const PRODUCTS_ROUTES: Routes = [
     loadComponent: () => import('./products-list-page.component').then((m) => m.ProductsListPageComponent),
   },
   {
+    path: 'categories',
+    loadComponent: () => import('./products-list-page.component').then((m) => m.ProductsListPageComponent),
+    data: { catalogTab: 'categories' },
+  },
+  {
+    path: 'packages',
+    loadComponent: () => import('./products-list-page.component').then((m) => m.ProductsListPageComponent),
+    data: { catalogTab: 'packages' },
+  },
+  {
     path: 'new',
     loadComponent: () => import('./products-form-page.component').then((m) => m.ProductsFormPageComponent),
   },

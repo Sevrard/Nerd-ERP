@@ -8,11 +8,16 @@ import { Product, ProductPayload } from '../../shared/models/product.model';
 export class ProductsApiService {
   private readonly api = inject(ApiClient);
 
-  search(workspaceId: string, params?: { q?: string; activeOnly?: boolean }): Observable<PageResponse<Product>> {
+  search(
+    workspaceId: string,
+    params?: { q?: string; activeOnly?: boolean; categoryId?: string; size?: number },
+  ): Observable<PageResponse<Product>> {
     return this.api.get<PageResponse<Product>>('/products', {
       workspaceId,
       q: params?.q,
       activeOnly: params?.activeOnly ?? true,
+      categoryId: params?.categoryId,
+      size: params?.size,
     });
   }
 

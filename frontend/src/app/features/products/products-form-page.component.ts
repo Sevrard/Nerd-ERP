@@ -6,6 +6,8 @@ import { ProductPayload } from '../../shared/models/product.model';
 import { ErrorBannerComponent } from '../../shared/ui/error-banner.component';
 import { LoadingStateComponent } from '../../shared/ui/loading-state.component';
 import { ProductsApiService } from './products-api.service';
+import { ProductCategoriesApiService } from './product-categories-api.service';
+import { ProductCategory } from '../../shared/models/product-category.model';
 import { apiErrorMessage } from '../../shared/utils/api-error.util';
 
 @Component({
@@ -32,6 +34,18 @@ import { apiErrorMessage } from '../../shared/utils/api-error.util';
           <div>
             <label class="mb-1 block text-xs text-slate-500">Nom</label>
             <input formControlName="name" class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white" />
+          </div>
+          <div>
+            <label class="mb-1 block text-xs text-slate-500">Catégorie</label>
+            <select formControlName="categoryId" class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white">
+              <option value="">— Aucune —</option>
+              @for (c of categories(); track c.id) {
+                <option [value]="c.id">{{ c.label }}</option>
+              }
+            </select>
+            <a routerLink="/products/categories" class="mt-1 inline-block text-xs text-brand-400 hover:text-brand-300">
+              Gérer les catégories
+            </a>
           </div>
           <div>
             <label class="mb-1 block text-xs text-slate-500">Description</label>
@@ -61,6 +75,7 @@ import { apiErrorMessage } from '../../shared/utils/api-error.util';
 })
 export class ProductsFormPageComponent implements OnInit {
   private readonly api = inject(ProductsApiService);
+  private readonly categoriesApi = inject(ProductCategoriesApiService);
   private readonly workspaces = inject(WorkspaceService);
   private readonly fb = inject(FormBuilder);
   private readonly route = inject(ActivatedRoute);
@@ -70,17 +85,25 @@ export class ProductsFormPageComponent implements OnInit {
   readonly loading = signal(false);
   readonly saving = signal(false);
   readonly error = signal<string | null>(null);
+  readonly categories = signal<ProductCategory[]>([]);
 
-  readonly form = this.fb.nonNullable.group({
+  readonly form = this.fb.group({
     referenceCode: ['', Validators.required],
     name: ['', Validators.required],
     description: [''],
+    categoryId: [''],
     unitPriceHt: [0, [Validators.required, Validators.min(0)]],
     vatRate: [20, [Validators.required, Validators.min(0)]],
     active: [true],
   });
 
   ngOnInit(): void {
+    const workspaceId = this.workspaces.selectedId();
+    if (workspaceId) {
+      this.categoriesApi.list(workspaceId).subscribe({
+        next: (list) => this.categories.set(list),
+      });
+    }
     const id = this.route.snapshot.paramMap.get('id');
     if (id && this.route.snapshot.url.some((s) => s.path === 'edit')) {
       this.editId = id;
@@ -91,6 +114,7 @@ export class ProductsFormPageComponent implements OnInit {
             referenceCode: p.referenceCode,
             name: p.name,
             description: p.description ?? '',
+            categoryId: p.categoryId ?? '',
             unitPriceHt: p.unitPriceHt,
             vatRate: p.vatRate,
             active: p.active,
@@ -109,10 +133,16 @@ export class ProductsFormPageComponent implements OnInit {
     if (this.form.invalid || this.saving()) {
       return;
     }
+    const raw = this.form.getRawValue();
     const payload: ProductPayload = {
       workspaceId: this.workspaces.requireSelectedId(),
-      ...this.form.getRawValue(),
-      description: this.form.value.description || null,
+      referenceCode: raw.referenceCode!,
+      name: raw.name!,
+      description: raw.description || null,
+      categoryId: raw.categoryId || null,
+      unitPriceHt: raw.unitPriceHt!,
+      vatRate: raw.vatRate!,
+      active: raw.active ?? true,
     };
     this.saving.set(true);
     const req = this.editId ? this.api.update(this.editId, payload) : this.api.create(payload);

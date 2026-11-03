@@ -1,0 +1,705 @@
+<div class="relative -mx-2 space-y-6 pb-10 sm:-mx-0">
+  @if (toast()) {
+    <div
+      class="fixed bottom-6 right-6 z-50 flex items-center gap-2 rounded-xl bg-cyan-500 px-5 py-3 text-sm font-semibold text-slate-950 shadow-2xl"
+    >
+      <app-lucide-icon name="sparkles" [size]="18" />
+      {{ toast() }}
+    </div>
+  }
+
+  <div class="flex flex-wrap items-start justify-between gap-4 border-b border-slate-800/80 pb-5">
+    <div class="flex items-start gap-3">
+      <div
+        class="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-tr from-cyan-500 to-indigo-600 shadow-lg shadow-cyan-500/20"
+      >
+        <app-lucide-icon name="file-text" [size]="20" class="text-white" />
+      </div>
+      <div>
+        <div class="flex flex-wrap items-center gap-2">
+          <h1 class="text-lg font-bold tracking-tight text-white">Édition de devis</h1>
+          <span
+            class="rounded border border-cyan-500/20 bg-cyan-500/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-cyan-400"
+            >Devis</span
+          >
+          <span
+            class="inline-flex items-center gap-1.5 rounded-full border border-amber-500/20 bg-amber-500/10 px-2.5 py-0.5 text-xs font-semibold text-amber-400"
+          >
+            <app-lucide-icon name="clock" [size]="14" />
+            {{ draftLabel() }} · {{ statusLabel() }}
+          </span>
+        </div>
+        <p class="text-sm text-slate-400">Client, prestations du catalogue et validation</p>
+      </div>
+    </div>
+    <div class="flex flex-wrap items-center gap-2">
+      <a
+        routerLink="/quotations"
+        class="inline-flex items-center gap-2 rounded-lg border border-slate-700/60 bg-slate-800 px-3.5 py-2 text-sm font-medium text-slate-200 transition hover:bg-slate-700"
+      >
+        ← Liste des devis
+      </a>
+      @if (editable()) {
+        <button
+          type="button"
+          class="inline-flex items-center gap-2 rounded-lg border border-slate-700/60 bg-slate-800 px-3.5 py-2 text-sm font-medium text-slate-200 transition hover:bg-slate-700"
+          (click)="startNewQuotation()"
+        >
+          <app-lucide-icon name="plus" [size]="16" class="text-cyan-400" />
+          Nouveau devis
+        </button>
+        <button
+          type="button"
+          class="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-emerald-500 to-teal-600 px-4 py-2 text-sm font-semibold text-slate-950 shadow-lg shadow-emerald-500/20 transition hover:from-emerald-400 hover:to-teal-500"
+          (click)="openPdfPreview()"
+        >
+          <app-lucide-icon name="eye" [size]="16" />
+          Aperçu PDF
+        </button>
+      }
+    </div>
+  </div>
+
+  <div class="space-y-6">
+    @if (error()) {
+      <app-error-banner [message]="error()!" />
+    }
+
+    @if (loading()) {
+      <app-loading-state />
+    } @else {
+      <form [formGroup]="form" class="space-y-6" (ngSubmit)="$event.preventDefault()">
+        <div class="grid grid-cols-1 gap-6 lg:grid-cols-12 lg:gap-8">
+          <!-- Colonne principale -->
+          <div class="space-y-6 lg:col-span-6">
+              <!-- Client -->
+              <section class="space-y-5 rounded-xl border border-slate-800 bg-slate-900/90 p-6 shadow-sm">
+                <div class="flex flex-wrap items-center justify-between gap-4">
+                  <div class="flex items-center gap-3">
+                    <div class="rounded-lg border border-cyan-500/20 bg-cyan-500/10 p-3 text-cyan-400">
+                      <app-lucide-icon name="users" [size]="22" />
+                    </div>
+                    <div>
+                      <h2 class="text-base font-bold text-white">Cadrage de l'affaire &amp; client</h2>
+                      <p class="text-sm text-slate-400">Recherchez et sélectionnez le destinataire du devis</p>
+                    </div>
+                  </div>
+                  @if (selectedCustomer()) {
+                    <span
+                      class="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-400"
+                    >
+                      <app-lucide-icon name="circle-check" [size]="14" />
+                      Client sélectionné
+                    </span>
+                  }
+                </div>
+
+                <div class="relative">
+                  <app-lucide-icon
+                    name="search"
+                    [size]="16"
+                    class="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500"
+                  />
+                  <input
+                    type="search"
+                    [value]="clientSearch()"
+                    [disabled]="!editable()"
+                    (focus)="openClientDropdown()"
+                    (input)="onClientSearchInput($any($event.target).value)"
+                    placeholder="Rechercher un client (nom, entreprise, e-mail, ville…)"
+                    class="w-full rounded-lg border border-slate-800 bg-slate-950 py-2.5 pl-10 pr-4 text-sm text-slate-200 placeholder-slate-500 transition focus:border-cyan-500/60 focus:outline-none focus:ring-1 focus:ring-cyan-500/60 disabled:opacity-60 lg:py-3"
+                  />
+                  @if (clientDropdownOpen() && editable()) {
+                    <div
+                      class="absolute left-0 right-0 top-full z-20 mt-2 divide-y divide-slate-800 overflow-hidden rounded-xl border border-slate-800 bg-slate-900 shadow-2xl"
+                    >
+                      @for (c of filteredClients(); track c.id) {
+                        <button
+                          type="button"
+                          class="flex w-full items-center justify-between px-4 py-3.5 text-left transition hover:bg-slate-800/80"
+                          (click)="selectCustomer(c)"
+                        >
+                          <div>
+                            <div class="text-sm font-semibold text-white">{{ customerLabel(c) }}</div>
+                            <div class="text-sm text-slate-400">
+                              {{ c.customerType === 'COMPANY' ? 'Entreprise' : 'Particulier' }}
+                              @if (c.email) {
+                                · {{ c.email }}
+                              }
+                            </div>
+                          </div>
+                        </button>
+                      } @empty {
+                        <p class="px-4 py-3 text-sm text-slate-500">Aucun client trouvé.</p>
+                      }
+                    </div>
+                  }
+                </div>
+
+                @if (selectedCustomer(); as c) {
+                  <div
+                    class="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-slate-800 bg-slate-950/80 p-5"
+                  >
+                    <div class="space-y-1.5">
+                      <div class="flex items-center gap-2 text-base font-bold text-white">
+                        <app-lucide-icon name="building" [size]="18" class="text-cyan-400" />
+                        {{ customerLabel(c) }}
+                      </div>
+                      <div class="flex flex-wrap items-center gap-4 text-sm text-slate-400">
+                        @if (c.email) {
+                          <span class="inline-flex items-center gap-1.5">
+                            <app-lucide-icon name="mail" [size]="14" class="text-slate-500" />
+                            {{ c.email }}
+                          </span>
+                        }
+                        @if (c.phone) {
+                          <span class="inline-flex items-center gap-1.5">
+                            <app-lucide-icon name="phone" [size]="14" class="text-slate-500" />
+                            {{ c.phone }}
+                          </span>
+                        }
+                      </div>
+                    </div>
+                    <span class="text-sm text-slate-500">{{ c.postalCode }} {{ c.city }}</span>
+                  </div>
+                }
+                <input type="hidden" formControlName="customerId" />
+              </section>
+
+              <!-- Catalogue -->
+              <section class="space-y-5 rounded-xl border border-slate-800 bg-slate-900/90 p-6 shadow-sm">
+                <div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
+                  <div class="flex items-center gap-3">
+                    <div class="rounded-lg border border-purple-500/20 bg-purple-500/10 p-3 text-purple-400">
+                      <app-lucide-icon name="package" [size]="22" />
+                    </div>
+                    <div>
+                      <h2 class="text-base font-bold text-white">Composition du devis</h2>
+                      <p class="text-sm text-slate-400">Ajoutez des prestations ou des packages au panier</p>
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-1 rounded-lg border border-slate-800 bg-slate-950 p-1">
+                    <button
+                      type="button"
+                      class="rounded-md px-4 py-2 text-sm font-semibold transition"
+                      [class.bg-cyan-500]="catalogTab() === 'products'"
+                      [class.text-slate-950]="catalogTab() === 'products'"
+                      [class.text-slate-400]="catalogTab() !== 'products'"
+                      (click)="setCatalogTab('products')"
+                    >
+                      Catalogue
+                    </button>
+                    <button
+                      type="button"
+                      class="inline-flex items-center gap-1.5 rounded-md px-4 py-2 text-sm font-semibold transition"
+                      [class.bg-cyan-500]="catalogTab() === 'packages'"
+                      [class.text-slate-950]="catalogTab() === 'packages'"
+                      [class.text-slate-400]="catalogTab() !== 'packages'"
+                      (click)="setCatalogTab('packages')"
+                    >
+                      <app-lucide-icon name="sparkles" [size]="14" />
+                      Packages
+                    </button>
+                  </div>
+                </div>
+
+                @if (catalogTab() === 'products') {
+                  <div
+                    class="flex flex-wrap items-center gap-3 rounded-xl border border-slate-800 bg-slate-900/90 p-3"
+                  >
+                    <div class="relative min-w-[280px] flex-1">
+                      <app-lucide-icon
+                        name="search"
+                        [size]="16"
+                        class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"
+                      />
+                      <input
+                        type="search"
+                        [value]="catalogSearch()"
+                        (input)="catalogSearch.set($any($event.target).value)"
+                        placeholder="Rechercher une prestation, réf. SKU…"
+                        class="w-full rounded-lg border border-slate-800 bg-slate-950 py-2 pl-9 pr-3 text-sm text-slate-200 placeholder-slate-500 transition focus:border-cyan-500/60 focus:outline-none focus:ring-1 focus:ring-cyan-500/60"
+                      />
+                    </div>
+                    <div class="flex items-center gap-2">
+                      <app-lucide-icon name="filter" [size]="16" class="hidden text-slate-500 sm:block" />
+                      <select
+                      [value]="catalogCategoryId()"
+                      (change)="catalogCategoryId.set($any($event.target).value)"
+                      class="rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-300 focus:border-cyan-500/60 focus:outline-none"
+                    >
+                      <option value="">Toutes les catégories</option>
+                      @for (cat of categories(); track cat.id) {
+                        <option [value]="cat.id">{{ cat.label }}</option>
+                      }
+                    </select>
+                    </div>
+                  </div>
+
+                  @if (catalogLoading()) {
+                    <app-loading-state />
+                  } @else {
+                    <div class="max-h-[min(560px,58vh)] space-y-3 overflow-y-auto pr-1">
+                      @for (p of filteredCatalogProducts(); track p.id) {
+                        @let cat = categoryById(p.categoryId);
+                        @let color = categoryTheme(cat);
+                        @let inCart = isProductInCart(p.id);
+                        <div
+                          class="group flex items-center justify-between gap-5 rounded-xl border border-slate-800/80 bg-slate-900/60 p-4 transition hover:border-slate-700/80 hover:bg-slate-800/40 sm:p-5"
+                        >
+                          <div class="min-w-0 flex-1 space-y-1.5">
+                            <div class="flex flex-wrap items-center gap-2">
+                              <span class="font-mono text-xs font-semibold text-slate-500">{{ p.referenceCode }}</span>
+                              @if (cat) {
+                                <span
+                                  class="inline-flex items-center gap-1 rounded-md border px-2.5 py-0.5 text-xs font-semibold"
+                                  [class]="color.bg + ' ' + color.text + ' ' + color.border"
+                                >
+                                  {{ cat.label }}
+                                </span>
+                              }
+                            </div>
+                            <h4 class="text-sm font-semibold text-slate-100 transition group-hover:text-white">
+                              {{ p.name }}
+                            </h4>
+                            @if (shortDescription(p)) {
+                              <p class="line-clamp-2 text-sm text-slate-400">{{ shortDescription(p) }}</p>
+                            }
+                          </div>
+                          <div class="flex shrink-0 flex-col items-end gap-3 text-right">
+                            <div class="font-mono text-base font-bold text-white">
+                              {{ priceFormatted(p.unitPriceHt) }} €
+                              <span class="text-xs font-normal text-slate-400">
+                                / {{ productUnitLabel(p) }}
+                              </span>
+                            </div>
+                            <button
+                              type="button"
+                              class="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition"
+                              [class.bg-cyan-500]="!inCart"
+                              [class.text-slate-950]="!inCart"
+                              [class.shadow-md]="!inCart"
+                              [class.shadow-cyan-500/20]="!inCart"
+                              [class.bg-slate-800]="inCart"
+                              [class.text-cyan-400]="inCart"
+                              [class.border]="inCart"
+                              [class.border-cyan-500/30]="inCart"
+                              [disabled]="!editable()"
+                              (click)="addProductToQuote(p)"
+                            >
+                              <app-lucide-icon name="plus" [size]="16" />
+                              {{ inCart ? 'Ajouter +1' : 'Ajouter' }}
+                            </button>
+                          </div>
+                        </div>
+                      } @empty {
+                        <p class="py-10 text-center text-sm text-slate-500">Aucune prestation dans le catalogue.</p>
+                      }
+                    </div>
+                  }
+                } @else {
+                  <p class="mb-3 text-sm text-slate-400">
+                    Injectez des ensembles de prestations pré-configurés dans le devis.
+                  </p>
+                  <div class="space-y-4">
+                    @for (pkg of packages(); track pkg.id) {
+                      <div
+                        class="rounded-xl border border-slate-800 bg-slate-950/80 p-5 transition hover:border-cyan-500/40"
+                      >
+                        <div class="flex flex-wrap items-start justify-between gap-4">
+                          <div class="min-w-0 flex-1 space-y-1">
+                            <span
+                              class="mb-1 inline-block rounded border px-2.5 py-0.5 text-xs font-bold"
+                              [class]="packageBadge(pkg.badgeTheme)"
+                            >
+                              {{ pkg.discountType === 'PERCENT' ? pkg.discountValue + ' %' : 'Remise fixe' }}
+                            </span>
+                            <h4 class="text-base font-bold text-white">{{ pkg.title }}</h4>
+                            @if (pkg.description) {
+                              <p class="text-sm text-slate-400">{{ pkg.description }}</p>
+                            }
+                          </div>
+                          <button
+                            type="button"
+                            class="inline-flex items-center gap-2 rounded-lg bg-cyan-500 px-4 py-2.5 text-sm font-bold text-slate-950 shadow-lg shadow-cyan-500/20 transition hover:bg-cyan-400 disabled:opacity-50"
+                            [disabled]="!editable()"
+                            (click)="injectPackage(pkg)"
+                          >
+                            <app-lucide-icon name="sparkles" [size]="14" />
+                            Injecter ce pack
+                          </button>
+                        </div>
+                      </div>
+                    } @empty {
+                      <p class="py-6 text-center text-sm text-slate-500">Aucun package configuré.</p>
+                    }
+                  </div>
+                }
+              </section>
+
+              <section class="space-y-5 rounded-xl border border-slate-800 bg-slate-900/90 p-6 shadow-sm">
+                <div class="flex items-center gap-3">
+                  <div class="rounded-lg border border-emerald-500/20 bg-emerald-500/10 p-3 text-emerald-400">
+                    <app-lucide-icon name="circle-check" [size]="22" />
+                  </div>
+                  <div>
+                    <h2 class="text-base font-bold text-white">Validation &amp; envoi</h2>
+                    <p class="text-sm text-slate-400">Dates, conditions et actions de finalisation</p>
+                  </div>
+                </div>
+                <div class="grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <label class="mb-1.5 block text-sm text-slate-400">Date d'émission</label>
+                    <input
+                      type="date"
+                      formControlName="issueDate"
+                      class="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-white"
+                    />
+                  </div>
+                  <div>
+                    <label class="mb-1.5 block text-sm text-slate-400">Valide jusqu'au</label>
+                    <input
+                      type="date"
+                      formControlName="validUntil"
+                      class="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-white"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label class="mb-1.5 block text-sm text-slate-400">Notes internes / conditions</label>
+                  <textarea
+                    formControlName="notes"
+                    rows="3"
+                    class="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-white"
+                  ></textarea>
+                </div>
+                @if (editable()) {
+                  <div class="flex flex-wrap gap-2 pt-2">
+                    <button
+                      type="button"
+                      class="rounded-lg bg-cyan-600 px-4 py-2 text-sm font-semibold text-white hover:bg-cyan-500 disabled:opacity-50"
+                      [disabled]="form.invalid || saving()"
+                      (click)="saveDraft()"
+                    >
+                      Enregistrer brouillon
+                    </button>
+                    <button
+                      type="button"
+                      class="inline-flex items-center gap-2 rounded-lg border border-slate-600 px-4 py-2 text-sm text-white hover:bg-slate-800 disabled:opacity-50"
+                      [disabled]="form.invalid || actionBusy() || saving()"
+                      (click)="saveAndSend()"
+                    >
+                      <app-lucide-icon name="send" [size]="16" class="text-emerald-400" />
+                      Enregistrer &amp; envoyer
+                    </button>
+                  </div>
+                }
+                @if (quotation()?.status === 'SENT') {
+                  <button
+                    type="button"
+                    class="rounded-lg border border-cyan-500/50 px-4 py-2 text-sm text-cyan-300 hover:bg-cyan-950 disabled:opacity-50"
+                    [disabled]="actionBusy()"
+                    (click)="runAction('accept')"
+                  >
+                    Marquer comme accepté
+                  </button>
+                }
+                @if (quotation()?.status === 'ACCEPTED') {
+                  <button
+                    type="button"
+                    class="rounded-lg bg-emerald-600 px-4 py-2 text-sm text-white hover:bg-emerald-500 disabled:opacity-50"
+                    [disabled]="actionBusy()"
+                    (click)="runAction('convert')"
+                  >
+                    Convertir en facture
+                  </button>
+                }
+              </section>
+          </div>
+
+          <!-- Devis en direct -->
+          <div class="lg:col-span-6">
+            <div
+              class="sticky top-4 space-y-4 rounded-xl border border-slate-800 bg-slate-950/90 p-4 shadow-xl lg:top-6"
+            >
+              <div
+                class="flex flex-col gap-3 border-b border-slate-800 pb-3 sm:flex-row sm:items-center sm:justify-between"
+              >
+                <div class="flex items-center gap-3">
+                  <div class="rounded-lg border border-cyan-500/20 bg-cyan-500/10 p-2.5 text-cyan-400">
+                    <app-lucide-icon name="file-text" [size]="22" />
+                  </div>
+                  <div>
+                    <h3 class="text-base font-bold text-white">Devis en direct</h3>
+                    <p class="text-sm text-slate-400">Aperçu client — mise à jour instantanée</p>
+                  </div>
+                </div>
+                <div class="flex flex-wrap items-center gap-2">
+                  <div class="flex items-center rounded-lg border border-slate-800 bg-slate-950 p-0.5">
+                    <button
+                      type="button"
+                      class="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-semibold transition sm:text-xs"
+                      [class]="
+                        previewViewMode() === 'screen'
+                          ? 'bg-cyan-500 text-slate-950 shadow'
+                          : 'text-slate-400 hover:text-slate-200'
+                      "
+                      title="Mode Cyber Dark"
+                      (click)="setPreviewViewMode('screen')"
+                    >
+                      <app-lucide-icon name="eye" [size]="14" />
+                      Dark
+                    </button>
+                    <button
+                      type="button"
+                      class="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-semibold transition sm:text-xs"
+                      [class]="
+                        previewViewMode() === 'print'
+                          ? 'bg-white text-slate-950 shadow'
+                          : 'text-slate-400 hover:text-slate-200'
+                      "
+                      title="Mode Papier / PDF"
+                      (click)="setPreviewViewMode('print')"
+                    >
+                      <app-lucide-icon name="file-text" [size]="14" />
+                      PDF
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    class="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-cyan-500 to-teal-500 px-2.5 py-1 text-[10px] font-bold text-slate-950 shadow-md shadow-cyan-500/20 sm:text-xs"
+                    (click)="printPreview()"
+                  >
+                    <app-lucide-icon name="printer" [size]="14" />
+                    Imprimer
+                  </button>
+                  <button
+                    type="button"
+                    class="rounded-lg border border-slate-700/60 px-2.5 py-1 text-[10px] font-semibold text-slate-300 hover:bg-slate-800 sm:text-xs"
+                    (click)="openPdfPreview()"
+                  >
+                    Plein écran
+                  </button>
+                </div>
+              </div>
+
+              <div
+                class="max-h-[min(520px,58vh)] overflow-y-auto rounded-xl border border-slate-800/80 pr-0.5"
+                [class.quotation-print-root]="!pdfPreviewOpen()"
+              >
+                <app-quotation-document-preview
+                  [embedded]="true"
+                  [viewMode]="previewViewMode()"
+                  [workspace]="issuerWorkspace()"
+                  [customer]="selectedCustomer()"
+                  [documentNumber]="draftLabel()"
+                  [statusLabel]="previewStatusBadge()"
+                  [issueDate]="form.value.issueDate || null"
+                  [validUntil]="form.value.validUntil || null"
+                  [subject]="previewNotesParts().subject"
+                  [executiveSummary]="previewNotesParts().summary"
+                  [lines]="previewLines()"
+                  [totals]="displayTotals()"
+                />
+              </div>
+
+              <button
+                type="button"
+                class="flex w-full items-center justify-between rounded-lg border border-slate-800 bg-slate-900/80 px-3 py-2 text-xs font-semibold text-slate-300 hover:bg-slate-800"
+                (click)="lineEditorOpen.set(!lineEditorOpen())"
+              >
+                <span class="inline-flex items-center gap-2">
+                  <app-lucide-icon name="shopping-cart" [size]="14" class="text-cyan-400" />
+                  Ajuster les lignes ({{ lines.length }})
+                </span>
+                <app-lucide-icon
+                  name="chevron"
+                  [size]="16"
+                  [class.rotate-90]="lineEditorOpen()"
+                  class="transition-transform"
+                />
+              </button>
+
+              @if (lineEditorOpen()) {
+              <div class="max-h-[min(280px,35vh)] space-y-4 overflow-y-auto pr-1" formArrayName="lines">
+                @if (!lines.controls.length || (lines.length === 1 && !lineDescription(0))) {
+                  <div
+                    class="rounded-xl border border-dashed border-slate-800 py-12 text-center text-slate-500"
+                  >
+                    <app-lucide-icon name="shopping-cart" [size]="40" class="mx-auto mb-3 opacity-30" />
+                    <p class="text-sm font-medium text-slate-300">Le devis est vide</p>
+                    <p class="mt-1 text-sm text-slate-500">Ajoutez des prestations depuis le catalogue.</p>
+                  </div>
+                } @else {
+                  @for (line of lines.controls; track $index; let i = $index) {
+                    @if (lineDescription(i)) {
+                      @let lcat = lineCategory(i);
+                      @let lcolor = categoryTheme(lcat);
+                      <div
+                        class="space-y-3 rounded-xl border border-slate-800 bg-slate-950/90 p-4 transition hover:border-slate-700"
+                        [formGroupName]="i"
+                      >
+                        <div class="flex items-start justify-between gap-3">
+                          <div class="min-w-0 flex-1">
+                            @if (lcat) {
+                              <span
+                                class="mb-1.5 inline-block rounded-md border px-2.5 py-0.5 text-xs font-semibold"
+                                [class]="lcolor.bg + ' ' + lcolor.text + ' ' + lcolor.border"
+                              >
+                                {{ lcat.label }}
+                              </span>
+                            }
+                            @if (lineProductRef(i); as ref) {
+                              <div class="font-mono text-xs text-slate-500">{{ ref }}</div>
+                            }
+                            <input
+                              formControlName="description"
+                              class="mt-1 w-full bg-transparent text-sm font-semibold text-white focus:outline-none"
+                            />
+                          </div>
+                          @if (editable()) {
+                            <button
+                              type="button"
+                              class="rounded-lg p-1.5 text-slate-500 transition hover:bg-slate-800 hover:text-rose-400"
+                              (click)="removeLine(i)"
+                            >
+                              <app-lucide-icon name="trash" [size]="16" />
+                            </button>
+                          }
+                        </div>
+                        <div
+                          class="flex flex-col gap-3 border-t border-slate-800/60 pt-3 sm:flex-row sm:items-center sm:justify-between"
+                        >
+                          <div
+                            class="flex items-center gap-2 rounded-lg border border-slate-800 bg-slate-900 px-1.5 py-1"
+                          >
+                            <button
+                              type="button"
+                              class="flex h-7 w-7 items-center justify-center rounded bg-slate-800 text-sm font-bold text-slate-300 hover:bg-slate-700 disabled:opacity-40"
+                              [disabled]="!editable()"
+                              (click)="bumpQuantity(i, -1)"
+                            >
+                              −
+                            </button>
+                            <input
+                              type="number"
+                              formControlName="quantity"
+                              class="w-12 bg-transparent text-center font-mono text-sm font-bold text-cyan-400 focus:outline-none"
+                            />
+                            <button
+                              type="button"
+                              class="flex h-7 w-7 items-center justify-center rounded bg-slate-800 text-sm font-bold text-slate-300 hover:bg-slate-700 disabled:opacity-40"
+                              [disabled]="!editable()"
+                              (click)="bumpQuantity(i, 1)"
+                            >
+                              +
+                            </button>
+                            <span class="pr-1 text-xs text-slate-500">{{ unitLabelForLine(i) }}</span>
+                          </div>
+                          <div class="text-right">
+                            <div class="font-mono text-sm font-bold text-white">{{ lineHt(i) }} HT</div>
+                            <div class="mt-1 flex flex-wrap items-center justify-end gap-1.5 text-xs text-slate-500">
+                              <input
+                                type="number"
+                                step="0.01"
+                                formControlName="unitPriceHt"
+                                class="w-20 rounded border border-slate-800 bg-slate-950 px-2 py-0.5 text-right font-mono text-xs text-slate-300 focus:border-cyan-500/50 focus:outline-none"
+                              />
+                              <span>€ HT · TVA</span>
+                              <input
+                                type="number"
+                                step="0.01"
+                                formControlName="vatRate"
+                                class="w-14 rounded border border-slate-800 bg-slate-950 px-2 py-0.5 text-right font-mono text-xs text-slate-300 focus:border-cyan-500/50 focus:outline-none"
+                              />
+                              <span>%</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    }
+                  }
+                }
+              </div>
+              }
+
+              @if (lineDescription(0)) {
+                @if (editable()) {
+                  <div class="space-y-2 border-t border-slate-800 pt-3">
+                    <button
+                      type="button"
+                      class="flex w-full items-center justify-center gap-2 rounded-xl bg-cyan-500 py-2.5 text-sm font-bold text-slate-950 shadow-lg shadow-cyan-500/20 transition hover:bg-cyan-400 disabled:opacity-50"
+                      [disabled]="form.invalid || saving()"
+                      (click)="saveDraft()"
+                    >
+                      <app-lucide-icon name="check" [size]="18" />
+                      Enregistrer le brouillon
+                    </button>
+                  </div>
+                }
+              }
+            </div>
+          </div>
+        </div>
+      </form>
+    }
+  </div>
+
+  @if (pdfPreviewOpen()) {
+    <div
+      id="quotation-preview-overlay"
+      class="fixed inset-0 z-50 overflow-y-auto bg-slate-950/95 py-6 px-4 backdrop-blur-md print:bg-white print:p-0"
+    >
+      <div class="mx-auto mb-6 max-w-5xl print:hidden">
+        <div
+          class="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-slate-800 bg-slate-900/90 p-4 shadow-xl backdrop-blur-md"
+        >
+          <div class="flex items-center gap-3">
+            <span class="font-sans text-lg font-extrabold tracking-widest text-slate-100">NERD GR</span>
+            <span
+              class="rounded-md border border-cyan-500/20 bg-cyan-500/10 px-2.5 py-1 text-xs font-semibold text-cyan-400"
+              >Devis professionnel officiel</span
+            >
+          </div>
+          <button
+            type="button"
+            class="rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-400 hover:text-white"
+            (click)="closePdfPreview()"
+          >
+            Fermer
+          </button>
+        </div>
+      </div>
+
+      <div class="quotation-print-root mx-auto max-w-4xl print:max-w-none">
+        <app-quotation-document-preview
+          [embedded]="false"
+          [viewMode]="previewViewMode()"
+          [workspace]="issuerWorkspace()"
+          [customer]="selectedCustomer()"
+          [documentNumber]="draftLabel()"
+          [statusLabel]="previewStatusBadge()"
+          [issueDate]="form.value.issueDate || null"
+          [validUntil]="form.value.validUntil || null"
+          [subject]="previewNotesParts().subject"
+          [executiveSummary]="previewNotesParts().summary"
+          [lines]="previewLines()"
+          [totals]="displayTotals()"
+        />
+      </div>
+
+      <div class="mx-auto mt-6 flex max-w-4xl justify-end gap-3 print:hidden">
+        @if (editable()) {
+          <button
+            type="button"
+            class="inline-flex items-center gap-2 rounded-lg bg-cyan-500 px-5 py-2 text-xs font-bold text-slate-950 hover:bg-cyan-400"
+            (click)="saveDraft()"
+          >
+            <app-lucide-icon name="check" [size]="16" />
+            Enregistrer le brouillon
+          </button>
+        }
+      </div>
+    </div>
+  }
+</div>

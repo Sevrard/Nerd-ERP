@@ -74,8 +74,18 @@ public class WorkspaceCascadeDeleter {
                 """, tenantId, workspaceId);
 
         exec("""
+                DELETE FROM catalog_package cp
+                WHERE cp.tenant_id = :tenantId AND cp.workspace_id = :workspaceId
+                """, tenantId, workspaceId);
+
+        exec("""
                 DELETE FROM product p
                 WHERE p.tenant_id = :tenantId AND p.workspace_id = :workspaceId
+                """, tenantId, workspaceId);
+
+        exec("""
+                DELETE FROM product_category pc
+                WHERE pc.tenant_id = :tenantId AND pc.workspace_id = :workspaceId
                 """, tenantId, workspaceId);
 
         exec("""

@@ -1,0 +1,313 @@
+<div class="-mx-2 space-y-6 pb-10 sm:-mx-0">
+  <div class="flex flex-wrap items-start justify-between gap-4 border-b border-slate-800/80 pb-5">
+    <div class="flex items-start gap-3">
+      <div
+        class="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-tr from-cyan-500 to-indigo-600 shadow-lg shadow-cyan-500/20"
+      >
+        <app-lucide-icon name="users" [size]="20" />
+      </div>
+      <div>
+        <div class="flex flex-wrap items-center gap-2">
+          <h1 class="text-lg font-bold tracking-tight text-white">Clients & CRM</h1>
+          <span
+            class="rounded border border-cyan-500/20 bg-cyan-500/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-cyan-400"
+            >CRM</span
+          >
+        </div>
+        <p class="text-xs text-slate-400">Annuaire clients, prospects et suivi commercial</p>
+      </div>
+    </div>
+
+    <a
+      routerLink="/customers/new"
+      class="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-emerald-500 to-teal-600 px-4 py-2 text-sm font-semibold text-slate-950 shadow-lg shadow-emerald-500/20 transition hover:from-emerald-400 hover:to-teal-500"
+    >
+      <app-lucide-icon name="user-plus" [size]="16" />
+      Nouveau client
+    </a>
+  </div>
+
+  @if (error()) {
+    <app-error-banner [message]="error()!" />
+  }
+
+  <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <div class="flex items-center gap-4 rounded-xl border border-slate-800 bg-slate-900/70 p-4">
+      <div class="rounded-lg border border-cyan-500/20 bg-cyan-500/10 p-3 text-cyan-400">
+        <app-lucide-icon name="users" [size]="24" />
+      </div>
+      <div>
+        <p class="text-xs font-medium text-slate-400">Total contacts</p>
+        <p class="text-2xl font-bold tracking-tight text-white">{{ stats().total }}</p>
+      </div>
+    </div>
+    <div class="flex items-center gap-4 rounded-xl border border-slate-800 bg-slate-900/70 p-4">
+      <div class="rounded-lg border border-cyan-500/20 bg-cyan-500/10 p-3 text-cyan-400">
+        <app-lucide-icon name="user-plus" [size]="24" />
+      </div>
+      <div>
+        <p class="text-xs font-medium text-slate-400">Prospects</p>
+        <p class="text-2xl font-bold tracking-tight text-white">{{ stats().prospects }}</p>
+      </div>
+    </div>
+    <div class="flex items-center gap-4 rounded-xl border border-slate-800 bg-slate-900/70 p-4">
+      <div class="rounded-lg border border-emerald-500/20 bg-emerald-500/10 p-3 text-emerald-400">
+        <app-lucide-icon name="check" [size]="24" />
+      </div>
+      <div>
+        <p class="text-xs font-medium text-slate-400">Clients actifs</p>
+        <p class="text-2xl font-bold tracking-tight text-white">{{ stats().clients }}</p>
+      </div>
+    </div>
+    <div class="flex items-center gap-4 rounded-xl border border-slate-800 bg-slate-900/70 p-4">
+      <div class="rounded-lg border border-amber-500/20 bg-amber-500/10 p-3 text-amber-400">
+        <app-lucide-icon name="clock" [size]="24" />
+      </div>
+      <div>
+        <p class="text-xs font-medium text-slate-400">Relances à traiter</p>
+        <p class="text-2xl font-bold tracking-tight text-white">{{ stats().followUpsDue }}</p>
+      </div>
+    </div>
+  </div>
+
+  <div
+    class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-800 bg-slate-900/90 p-3"
+  >
+    <div class="flex min-w-[280px] flex-1 flex-wrap items-center gap-3">
+      <div class="relative w-full max-w-md">
+        <app-lucide-icon
+          name="search"
+          [size]="16"
+          class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"
+        />
+        <input
+          type="search"
+          [value]="filterQ()"
+          (input)="onSearchInput($any($event.target).value)"
+          placeholder="Rechercher nom, e-mail, ville, téléphone…"
+          class="w-full rounded-lg border border-slate-800 bg-slate-950 py-2 pl-9 pr-9 text-sm text-slate-200 placeholder-slate-500 transition focus:border-cyan-500/60 focus:outline-none focus:ring-1 focus:ring-cyan-500/60"
+        />
+        @if (filterQ()) {
+          <button
+            type="button"
+            class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+            (click)="clearSearch()"
+          >
+            <app-lucide-icon name="x" [size]="14" />
+          </button>
+        }
+      </div>
+      <div class="flex items-center gap-2">
+        <app-lucide-icon name="filter" [size]="16" class="hidden text-slate-500 sm:block" />
+        <select
+          [value]="filterStatus()"
+          (change)="onStatusFilterChange($any($event.target).value)"
+          class="rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-300 focus:border-cyan-500/60 focus:outline-none"
+        >
+          <option value="">Tous les statuts</option>
+          <option value="PROSPECT">Prospects</option>
+          <option value="CLIENT">Clients</option>
+          <option value="INACTIVE">Inactifs</option>
+        </select>
+      </div>
+    </div>
+    <span class="text-xs font-medium text-slate-500">
+      {{ filteredCustomers().length }} résultat{{ filteredCustomers().length > 1 ? 's' : '' }}
+    </span>
+  </div>
+
+  @if (loading()) {
+    <app-loading-state />
+  } @else if (!filteredCustomers().length) {
+    <app-empty-state title="Aucun client trouvé." />
+  } @else {
+    <div class="overflow-hidden rounded-xl border border-slate-800/80 bg-slate-900/60 shadow-xl">
+      <div class="overflow-x-auto">
+        <table class="w-full border-collapse text-left">
+          <thead>
+            <tr class="border-b border-slate-800 bg-slate-900/90 text-[11px] font-semibold text-slate-400">
+              <th
+                appSortableTh
+                label="Nom & type"
+                columnKey="name"
+                [sortKey]="customerSortKey()"
+                [sortDir]="customerSortDir()"
+                (columnSort)="onCustomerSort($event)"
+              ></th>
+              <th
+                appSortableTh
+                label="Contact"
+                columnKey="email"
+                [sortKey]="customerSortKey()"
+                [sortDir]="customerSortDir()"
+                (columnSort)="onCustomerSort($event)"
+              ></th>
+              <th
+                appSortableTh
+                label="Localisation"
+                columnKey="location"
+                [sortKey]="customerSortKey()"
+                [sortDir]="customerSortDir()"
+                (columnSort)="onCustomerSort($event)"
+              ></th>
+              <th
+                appSortableTh
+                label="Statut"
+                columnKey="status"
+                [sortKey]="customerSortKey()"
+                [sortDir]="customerSortDir()"
+                (columnSort)="onCustomerSort($event)"
+              ></th>
+              <th class="w-36 px-4 py-3.5 text-right uppercase tracking-wider">Actions</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-800/60 text-sm">
+            @for (c of sortedFilteredCustomers(); track c.id) {
+              @let editing = editingCustomerId() === c.id;
+              @let draft = customerEditDraft();
+              <tr class="group transition hover:bg-slate-800/40" [class.bg-cyan-950/20]="editing">
+                <td class="px-4 py-3.5">
+                  @if (editing && draft) {
+                    @if (c.customerType === 'COMPANY') {
+                      <input
+                        type="text"
+                        [value]="draft.companyName"
+                        (input)="patchCustomerDraft({ companyName: $any($event.target).value })"
+                        placeholder="Raison sociale"
+                        class="w-full rounded border border-cyan-500/50 bg-slate-950 px-2 py-1 text-sm font-semibold text-white"
+                      />
+                    } @else {
+                      <div class="flex gap-2">
+                        <input
+                          type="text"
+                          [value]="draft.firstName"
+                          (input)="patchCustomerDraft({ firstName: $any($event.target).value })"
+                          placeholder="Prénom"
+                          class="min-w-0 flex-1 rounded border border-cyan-500/50 bg-slate-950 px-2 py-1 text-sm text-white"
+                        />
+                        <input
+                          type="text"
+                          [value]="draft.lastName"
+                          (input)="patchCustomerDraft({ lastName: $any($event.target).value })"
+                          placeholder="Nom"
+                          class="min-w-0 flex-1 rounded border border-cyan-500/50 bg-slate-950 px-2 py-1 text-sm text-white"
+                        />
+                      </div>
+                    }
+                  } @else {
+                    <div class="font-semibold text-slate-200 transition group-hover:text-white">{{ label(c) }}</div>
+                  }
+                  <div class="mt-0.5 text-xs text-slate-500">{{ typeLabel(c) }}</div>
+                </td>
+                <td class="px-4 py-3.5">
+                  @if (editing && draft) {
+                    <input
+                      type="email"
+                      [value]="draft.email"
+                      (input)="patchCustomerDraft({ email: $any($event.target).value })"
+                      placeholder="E-mail"
+                      class="mb-1 w-full rounded border border-cyan-500/50 bg-slate-950 px-2 py-1 text-sm text-white"
+                    />
+                    <input
+                      type="tel"
+                      [value]="draft.phone"
+                      (input)="patchCustomerDraft({ phone: $any($event.target).value })"
+                      placeholder="Téléphone"
+                      class="w-full rounded border border-slate-700 bg-slate-950 px-2 py-1 font-mono text-xs text-white"
+                    />
+                  } @else {
+                    <div class="text-slate-300">{{ c.email ?? '—' }}</div>
+                    @if (c.phone) {
+                      <div class="mt-0.5 font-mono text-xs text-slate-500">{{ c.phone }}</div>
+                    }
+                  }
+                </td>
+                <td class="px-4 py-3.5 text-slate-400">
+                  @if (editing && draft) {
+                    <div class="flex gap-2">
+                      <input
+                        type="text"
+                        [value]="draft.postalCode"
+                        (input)="patchCustomerDraft({ postalCode: $any($event.target).value })"
+                        placeholder="CP"
+                        class="w-20 rounded border border-slate-700 bg-slate-950 px-2 py-1 text-xs text-white"
+                      />
+                      <input
+                        type="text"
+                        [value]="draft.city"
+                        (input)="patchCustomerDraft({ city: $any($event.target).value })"
+                        placeholder="Ville"
+                        class="min-w-0 flex-1 rounded border border-slate-700 bg-slate-950 px-2 py-1 text-sm text-white"
+                      />
+                    </div>
+                  } @else {
+                    {{ locationLine(c) }}
+                  }
+                </td>
+                <td class="px-4 py-3.5">
+                  @if (editing && draft) {
+                    <select
+                      [value]="draft.status"
+                      (change)="patchCustomerDraft({ status: $any($event.target).value })"
+                      class="rounded-lg border border-cyan-500/50 bg-slate-950 px-2 py-1 text-xs text-white"
+                    >
+                      <option value="PROSPECT">Prospect</option>
+                      <option value="CLIENT">Client</option>
+                      <option value="INACTIVE">Inactif</option>
+                    </select>
+                  } @else {
+                    <span
+                      class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold"
+                      [class]="statusBadgeClass(c.status)"
+                    >
+                      {{ statusLabel(c.status) }}
+                    </span>
+                    @if (c.nextFollowUpAt) {
+                      <div class="mt-1 text-[11px] text-slate-500">
+                        Relance : {{ c.nextFollowUpAt | date: 'dd/MM/yyyy' }}
+                      </div>
+                    }
+                  }
+                </td>
+                <td class="px-4 py-3.5 text-right">
+                  <div class="flex items-center justify-end gap-0.5 opacity-90 group-hover:opacity-100">
+                    @if (editing) {
+                      <app-icon-action
+                        icon="check"
+                        label="Enregistrer"
+                        variant="brand"
+                        [loading]="savingCustomerId() === c.id"
+                        (action)="saveCustomerInlineEdit(c)"
+                      />
+                      <app-icon-action icon="x" label="Annuler" (action)="cancelCustomerInlineEdit()" />
+                    } @else {
+                      <app-icon-action icon="eye" label="Voir" variant="brand" [link]="['/customers', c.id]" />
+                      <app-icon-action
+                        icon="pencil"
+                        label="Modifier inline"
+                        variant="default"
+                        (action)="startCustomerInlineEdit(c)"
+                      />
+                      <app-icon-action
+                        icon="external-link"
+                        label="Fiche complète"
+                        [link]="['/customers', c.id, 'edit']"
+                      />
+                      <app-icon-action
+                        icon="trash"
+                        label="Supprimer"
+                        variant="danger"
+                        [loading]="deletingId() === c.id"
+                        (action)="confirmDelete(c)"
+                      />
+                    }
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+  }
+</div>

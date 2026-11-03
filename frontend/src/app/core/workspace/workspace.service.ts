@@ -1,7 +1,7 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { Observable, tap } from 'rxjs';
 import { ApiClient } from '../api/api-client.service';
-import { Workspace } from '../../shared/models/workspace.model';
+import { Workspace, WorkspaceUpdatePayload } from '../../shared/models/workspace.model';
 
 const STORAGE_KEY = 'nerd-erp.workspace-id';
 
@@ -31,11 +31,38 @@ export class WorkspaceService {
     );
   }
 
+  /** Recharge un workspace (profil émetteur à jour pour devis / factures). */
+  refreshWorkspace(id: string): Observable<Workspace> {
+    return this.api.get<Workspace>(`/workspaces/${id}`).pipe(
+      tap((updated) => {
+        this.workspacesSignal.update((list) => {
+          const idx = list.findIndex((w) => w.id === updated.id);
+          if (idx < 0) {
+            return [...list, updated].sort((a, b) => a.name.localeCompare(b.name));
+          }
+          const next = [...list];
+          next[idx] = updated;
+          return next;
+        });
+      }),
+    );
+  }
+
   createWorkspace(payload: { name: string; slug?: string }): Observable<Workspace> {
     return this.api.post<Workspace>('/workspaces', payload).pipe(
       tap((created) => {
         this.workspacesSignal.update((list) => [...list, created].sort((a, b) => a.name.localeCompare(b.name)));
         this.selectWorkspace(created.id);
+      }),
+    );
+  }
+
+  updateWorkspace(id: string, payload: WorkspaceUpdatePayload): Observable<Workspace> {
+    return this.api.put<Workspace>(`/workspaces/${id}`, payload).pipe(
+      tap((updated) => {
+        this.workspacesSignal.update((list) =>
+          list.map((w) => (w.id === updated.id ? updated : w)).sort((a, b) => a.name.localeCompare(b.name)),
+        );
       }),
     );
   }

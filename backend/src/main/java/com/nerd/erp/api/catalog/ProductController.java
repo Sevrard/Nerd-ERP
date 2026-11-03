@@ -37,8 +37,9 @@ public class ProductController {
             @RequestParam UUID workspaceId,
             @RequestParam(defaultValue = "true") boolean activeOnly,
             @RequestParam(required = false) String q,
+            @RequestParam(required = false) UUID categoryId,
             @PageableDefault(size = 20, sort = "name", direction = Sort.Direction.ASC) Pageable pageable) {
-        return productService.search(workspaceId, activeOnly, q, pageable);
+        return productService.search(workspaceId, activeOnly, q, categoryId, pageable);
     }
 
     @GetMapping("/{id}")

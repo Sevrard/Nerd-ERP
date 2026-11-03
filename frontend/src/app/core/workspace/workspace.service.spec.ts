@@ -5,26 +5,29 @@ import { WorkspaceService } from './workspace.service';
 import { Workspace } from '../../shared/models/workspace.model';
 
 describe('WorkspaceService', () => {
-  const wsA: Workspace = {
-    id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+  const baseWs = (over: Partial<Workspace> & Pick<Workspace, 'id' | 'name' | 'slug'>): Workspace => ({
     organizationId: 'org-1',
-    name: 'Alpha',
-    slug: 'alpha',
     currencyCode: 'EUR',
     brandColor: null,
     logoUrl: null,
     active: true,
-  };
-  const wsB: Workspace = {
-    id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
-    organizationId: 'org-1',
-    name: 'Beta',
-    slug: 'beta',
-    currencyCode: 'EUR',
-    brandColor: null,
-    logoUrl: null,
-    active: true,
-  };
+    legalSubtitle: null,
+    addressLine1: null,
+    addressLine2: null,
+    postalCode: null,
+    city: null,
+    region: null,
+    countryCode: 'FR',
+    contactEmail: null,
+    websiteUrl: null,
+    siren: null,
+    vatNumber: null,
+    invoicePrefix: 'FAC',
+    quotationPrefix: 'DEV',
+    ...over,
+  });
+  const wsA = baseWs({ id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', name: 'Alpha', slug: 'alpha' });
+  const wsB = baseWs({ id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', name: 'Beta', slug: 'beta' });
 
   let service: WorkspaceService;
 

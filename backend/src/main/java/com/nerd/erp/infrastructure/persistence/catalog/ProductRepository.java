@@ -20,6 +20,8 @@ public interface ProductRepository extends JpaRepository<Product, UUID> {
     boolean existsByTenantIdAndWorkspaceIdAndReferenceCodeIgnoreCase(
             UUID tenantId, UUID workspaceId, String referenceCode);
 
+    boolean existsByTenantIdAndCategoryId(UUID tenantId, UUID categoryId);
+
     Optional<Product> findByTenantIdAndWorkspaceIdAndEtsyListingId(
             UUID tenantId, UUID workspaceId, Long etsyListingId);
 
@@ -27,21 +29,25 @@ public interface ProductRepository extends JpaRepository<Product, UUID> {
             SELECT p FROM Product p
             WHERE p.tenantId = :tenantId AND p.workspaceId = :workspaceId
             AND (:activeOnly = false OR p.active = true)
+            AND (:categoryId IS NULL OR p.categoryId = :categoryId)
             """)
     Page<Product> listByWorkspace(@Param("tenantId") UUID tenantId,
                                   @Param("workspaceId") UUID workspaceId,
                                   @Param("activeOnly") boolean activeOnly,
+                                  @Param("categoryId") UUID categoryId,
                                   Pageable pageable);
 
     @Query("""
             SELECT p FROM Product p
             WHERE p.tenantId = :tenantId AND p.workspaceId = :workspaceId
             AND (:activeOnly = false OR p.active = true)
+            AND (:categoryId IS NULL OR p.categoryId = :categoryId)
             AND (LOWER(p.name) LIKE :qPattern OR LOWER(p.referenceCode) LIKE :qPattern)
             """)
     Page<Product> searchByWorkspace(@Param("tenantId") UUID tenantId,
                                     @Param("workspaceId") UUID workspaceId,
                                     @Param("activeOnly") boolean activeOnly,
+                                    @Param("categoryId") UUID categoryId,
                                     @Param("qPattern") String qPattern,
                                     Pageable pageable);
 }

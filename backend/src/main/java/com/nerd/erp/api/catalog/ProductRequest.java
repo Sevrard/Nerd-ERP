@@ -14,6 +14,7 @@ public record ProductRequest(
         String description,
         @NotNull @DecimalMin("0.0") BigDecimal unitPriceHt,
         @NotNull BigDecimal vatRate,
-        Boolean active
+        Boolean active,
+        UUID categoryId
 ) {
 }

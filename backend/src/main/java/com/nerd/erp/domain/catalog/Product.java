@@ -36,6 +36,9 @@ public class Product extends TenantScopedEntity {
     @Column(nullable = false)
     private boolean active = true;
 
+    @Column(name = "category_id")
+    private UUID categoryId;
+
     @Column(name = "etsy_listing_id")
     private Long etsyListingId;
 }

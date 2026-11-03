@@ -7,6 +7,9 @@ export interface Product {
   unitPriceHt: number;
   vatRate: number;
   active: boolean;
+  /** Présents lorsque le backend est à jour (migration V11+). */
+  categoryId?: string | null;
+  categoryLabel?: string | null;
 }
 
-export type ProductPayload = Omit<Product, 'id'>;
+export type ProductPayload = Omit<Product, 'id' | 'categoryLabel'>;

@@ -15,6 +15,9 @@ export function apiErrorMessage(err: unknown, fallback = 'Une erreur est survenu
     if (typeof body === 'string' && body.trim()) {
       return body.trim();
     }
+    if (err.status === 401 || err.status === 403) {
+      return 'Session expirée ou invalide — déconnectez-vous puis reconnectez-vous.';
+    }
     if (err.statusText && err.statusText !== 'Unknown Error') {
       return err.statusText;
     }

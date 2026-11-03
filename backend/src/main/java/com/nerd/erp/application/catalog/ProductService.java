@@ -1,8 +1,11 @@
 package com.nerd.erp.application.catalog;
 
 import com.nerd.erp.domain.catalog.Product;
+import com.nerd.erp.domain.catalog.ProductCategory;
 import com.nerd.erp.api.catalog.ProductRequest;
 import com.nerd.erp.api.catalog.ProductResponse;
+import com.nerd.erp.infrastructure.persistence.catalog.CatalogPackageItemRepository;
+import com.nerd.erp.infrastructure.persistence.catalog.ProductCategoryRepository;
 import com.nerd.erp.infrastructure.persistence.catalog.ProductRepository;
 import com.nerd.erp.infrastructure.persistence.maintenance.MaintenanceContractRepository;
 import com.nerd.erp.infrastructure.persistence.quotation.QuotationLineRepository;
@@ -16,41 +19,60 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 public class ProductService {
 
     private final ProductRepository productRepository;
+    private final ProductCategoryRepository categoryRepository;
+    private final CatalogPackageItemRepository catalogPackageItemRepository;
+    private final ProductCategoryService categoryService;
     private final WorkspaceService workspaceService;
     private final QuotationLineRepository quotationLineRepository;
     private final MaintenanceContractRepository maintenanceContractRepository;
 
     public ProductService(ProductRepository productRepository,
+                          ProductCategoryRepository categoryRepository,
+                          CatalogPackageItemRepository catalogPackageItemRepository,
+                          ProductCategoryService categoryService,
                           WorkspaceService workspaceService,
                           QuotationLineRepository quotationLineRepository,
                           MaintenanceContractRepository maintenanceContractRepository) {
         this.productRepository = productRepository;
+        this.categoryRepository = categoryRepository;
+        this.catalogPackageItemRepository = catalogPackageItemRepository;
+        this.categoryService = categoryService;
         this.workspaceService = workspaceService;
         this.quotationLineRepository = quotationLineRepository;
         this.maintenanceContractRepository = maintenanceContractRepository;
     }
 
     @Transactional(readOnly = true)
-    public PageResponse<ProductResponse> search(UUID workspaceId, boolean activeOnly, String q, Pageable pageable) {
+    public PageResponse<ProductResponse> search(UUID workspaceId, boolean activeOnly, String q,
+                                                UUID categoryId, Pageable pageable) {
         UUID tenantId = SecurityContextHelper.requireTenantId();
         workspaceService.requireInTenant(workspaceId, tenantId);
+        if (categoryId != null) {
+            categoryService.requireCategoryInWorkspace(categoryId, workspaceId, tenantId);
+        }
+        Map<UUID, String> categoryLabels = categoryLabels(tenantId, workspaceId);
         String term = q == null || q.isBlank() ? null : q.trim();
         Page<Product> page = term == null
-                ? productRepository.listByWorkspace(tenantId, workspaceId, activeOnly, pageable)
-                : productRepository.searchByWorkspace(tenantId, workspaceId, activeOnly,
+                ? productRepository.listByWorkspace(tenantId, workspaceId, activeOnly, categoryId, pageable)
+                : productRepository.searchByWorkspace(tenantId, workspaceId, activeOnly, categoryId,
                 "%" + term.toLowerCase() + "%", pageable);
-        return PageResponse.from(page.map(this::toResponse));
+        return PageResponse.from(page.map(p -> toResponse(p, categoryLabels)));
     }
 
     @Transactional(readOnly = true)
     public ProductResponse get(UUID id) {
-        return toResponse(requireProduct(id));
+        Product product = requireProduct(id);
+        Map<UUID, String> categoryLabels = categoryLabels(
+                product.getTenantId(), product.getWorkspaceId());
+        return toResponse(product, categoryLabels);
     }
 
     @Transactional
@@ -61,7 +83,8 @@ public class ProductService {
         Product product = new Product();
         product.setTenantId(tenantId);
         apply(product, request);
-        return toResponse(productRepository.save(product));
+        Product saved = productRepository.save(product);
+        return toResponse(saved, categoryLabels(saved.getTenantId(), saved.getWorkspaceId()));
     }
 
     @Transactional
@@ -72,7 +95,8 @@ public class ProductService {
             throw new ApiException(HttpStatus.BAD_REQUEST, "Cannot move product to another workspace");
         }
         apply(product, request);
-        return toResponse(productRepository.save(product));
+        Product saved = productRepository.save(product);
+        return toResponse(saved, categoryLabels(saved.getTenantId(), saved.getWorkspaceId()));
     }
 
     @Transactional
@@ -87,6 +111,10 @@ public class ProductService {
         if (maintenanceContractRepository.existsByTenantIdAndProductId(tenantId, id)) {
             throw new ApiException(HttpStatus.CONFLICT,
                     "Impossible de supprimer : produit lié à un contrat de maintenance");
+        }
+        if (catalogPackageItemRepository.existsByTenantIdAndProductId(tenantId, id)) {
+            throw new ApiException(HttpStatus.CONFLICT,
+                    "Impossible de supprimer : produit inclus dans un package catalogue");
         }
         productRepository.delete(product);
     }
@@ -113,10 +141,25 @@ public class ProductService {
         if (request.active() != null) {
             product.setActive(request.active());
         }
+        if (request.categoryId() != null) {
+            categoryService.requireCategoryInWorkspace(
+                    request.categoryId(), request.workspaceId(), product.getTenantId());
+            product.setCategoryId(request.categoryId());
+        } else {
+            product.setCategoryId(null);
+        }
     }
 
-    private ProductResponse toResponse(Product p) {
+    private Map<UUID, String> categoryLabels(UUID tenantId, UUID workspaceId) {
+        return categoryRepository.findByTenantIdAndWorkspaceIdOrderBySortOrderAscLabelAsc(tenantId, workspaceId)
+                .stream()
+                .collect(Collectors.toMap(ProductCategory::getId, ProductCategory::getLabel, (a, b) -> a));
+    }
+
+    private ProductResponse toResponse(Product p, Map<UUID, String> categoryLabels) {
+        UUID categoryId = p.getCategoryId();
+        String categoryLabel = categoryId != null ? categoryLabels.get(categoryId) : null;
         return new ProductResponse(p.getId(), p.getWorkspaceId(), p.getReferenceCode(), p.getName(),
-                p.getDescription(), p.getUnitPriceHt(), p.getVatRate(), p.isActive());
+                p.getDescription(), p.getUnitPriceHt(), p.getVatRate(), p.isActive(), categoryId, categoryLabel);
     }
 }

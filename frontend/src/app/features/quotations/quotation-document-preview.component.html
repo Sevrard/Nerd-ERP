@@ -1,0 +1,590 @@
+<div
+  class="mx-auto rounded-2xl transition-all duration-300 print:shadow-none print:m-0 print:w-full print:max-w-none print:rounded-none print:border-0"
+  [class.max-w-4xl]="!embedded()"
+  [class.quotation-preview-light]="isPrint()"
+  [class]="
+    isPrint()
+      ? 'border border-slate-300 bg-white p-6 text-slate-900 shadow-xl sm:p-10 print:p-8'
+      : 'border border-slate-800/80 bg-slate-900/90 p-4 text-slate-100 shadow-2xl shadow-cyan-950/40 backdrop-blur-xl sm:p-8 ' +
+        (embedded() ? 'text-[11px] sm:text-xs' : 'sm:p-10')
+  "
+>
+  <!-- En-tête -->
+  <div
+    class="flex flex-col items-start justify-between gap-6 border-b pb-6 sm:flex-row sm:pb-8"
+    [class.border-slate-300]="isPrint()"
+    [class.border-slate-800]="!isPrint()"
+  >
+    <div class="space-y-3">
+      @if (isPrint()) {
+        <div class="flex select-none items-center gap-2">
+          <span class="font-sans text-2xl font-extrabold tracking-widest text-slate-900">NERD GR</span>
+          <div class="flex h-8 w-8 items-center justify-center rounded-full border-2 border-slate-900 bg-white">
+            <span class="font-mono text-xs font-bold text-slate-900">&lt;/&gt;</span>
+          </div>
+          <span class="-ml-1 font-sans text-2xl font-extrabold tracking-widest text-slate-900">UP</span>
+        </div>
+      } @else {
+        <div class="flex select-none items-center gap-3">
+          <span class="font-sans text-xl font-extrabold tracking-widest text-slate-100">NERD GR</span>
+          <div
+            class="relative flex h-8 w-8 items-center justify-center rounded-full border-2 border-cyan-400 bg-slate-900 shadow-md shadow-cyan-500/20"
+          >
+            <span class="font-mono text-xs font-bold tracking-tighter text-cyan-400">&lt;/&gt;</span>
+          </div>
+          <span class="-ml-1 font-sans text-xl font-extrabold tracking-widest text-slate-100">UP</span>
+        </div>
+      }
+
+      @if (workspace(); as w) {
+        <div class="space-y-1.5 text-xs" [class.text-slate-700]="isPrint()" [class.text-slate-400]="!isPrint()">
+          <p class="font-semibold leading-snug" [class.text-slate-900]="isPrint()" [class.text-slate-200]="!isPrint()">
+            {{ issuerTitle(w) }}
+          </p>
+          @for (addr of issuerAddressLines(w); track $index) {
+            <p class="flex items-start gap-1.5">
+              @if ($first) {
+                <app-lucide-icon
+                  name="map-pin"
+                  [size]="14"
+                  class="mt-0.5 shrink-0"
+                  [class.text-slate-600]="isPrint()"
+                  [class.opacity-70]="!isPrint()"
+                />
+              } @else {
+                <span class="w-[14px] shrink-0"></span>
+              }
+              <span>{{ addr }}</span>
+            </p>
+          }
+          @if (w.contactEmail) {
+            <p class="flex items-center gap-1.5">
+              <app-lucide-icon
+                name="mail"
+                [size]="14"
+                class="shrink-0"
+                [class.text-slate-600]="isPrint()"
+                [class.opacity-70]="!isPrint()"
+              />
+              {{ w.contactEmail }}
+            </p>
+          }
+          @if (w.websiteUrl) {
+            <p class="flex items-center gap-1.5">
+              <app-lucide-icon
+                name="globe"
+                [size]="14"
+                class="shrink-0"
+                [class.text-slate-600]="isPrint()"
+                [class.opacity-70]="!isPrint()"
+              />
+              {{ w.websiteUrl }}
+            </p>
+          }
+          @if (issuerSirenLabel(w) || issuerVatLabel(w)) {
+            <p
+              class="pt-1 font-mono text-[11px] leading-relaxed"
+              [class.text-slate-800]="isPrint()"
+            >
+              @if (issuerSirenLabel(w); as siren) {
+                <span>{{ siren }}</span>
+              }
+              @if (issuerSirenLabel(w) && issuerVatLabel(w)) {
+                <span> • </span>
+              }
+              @if (issuerVatLabel(w); as vat) {
+                <span>{{ vat }}</span>
+              }
+            </p>
+          }
+          @if (!issuerProfileComplete(w)) {
+            <p class="text-[11px] italic text-amber-500/90">
+              Complétez l’adresse et les identifiants légaux du workspace (roue crantée).
+            </p>
+          }
+        </div>
+      } @else {
+        <p class="text-xs italic text-slate-500">Workspace non chargé.</p>
+      }
+    </div>
+
+    <div
+      class="w-full min-w-[240px] space-y-2.5 rounded-xl border p-4 sm:w-auto"
+      [class]="
+        isPrint() ? 'border-slate-300 bg-slate-100 text-slate-900' : 'border-slate-800 bg-slate-950/80 text-slate-200'
+      "
+    >
+      <div
+        class="flex items-center justify-between border-b pb-2"
+        [class.border-slate-300]="isPrint()"
+        [class.border-slate-800]="!isPrint()"
+      >
+        <span
+          class="text-xs font-bold uppercase tracking-wider"
+          [class.text-slate-600]="isPrint()"
+          [class.text-slate-400]="!isPrint()"
+          >Document</span
+        >
+        <span
+          class="rounded-full border px-2.5 py-0.5 text-xs font-semibold"
+          [class]="
+            isPrint()
+              ? 'border-cyan-600 bg-cyan-50 text-cyan-950'
+              : 'border-cyan-500/30 bg-cyan-500/10 text-cyan-400'
+          "
+        >
+          {{ statusLabel() }}
+        </span>
+      </div>
+      <div class="space-y-1 font-mono text-xs">
+        <div class="flex justify-between gap-4">
+          <span [class.text-slate-600]="isPrint()" [class.text-slate-400]="!isPrint()">N° Devis :</span>
+          <span class="font-bold" [class.text-cyan-800]="isPrint()" [class.text-cyan-500]="!isPrint()">{{
+            documentNumber()
+          }}</span>
+        </div>
+        <div class="flex justify-between gap-4">
+          <span [class.text-slate-600]="isPrint()" [class.text-slate-400]="!isPrint()">Date d'émission :</span>
+          <span [class.text-slate-900]="isPrint()">
+            @if (issueDate()) {
+              {{ issueDate() | date: 'dd/MM/yyyy' }}
+            } @else {
+              —
+            }
+          </span>
+        </div>
+        <div class="flex justify-between gap-4">
+          <span [class.text-slate-600]="isPrint()" [class.text-slate-400]="!isPrint()">Validité :</span>
+          <span [class.text-slate-900]="isPrint()">
+            @if (validUntil()) {
+              {{ validUntil() | date: 'dd/MM/yyyy' }}
+            } @else {
+              —
+            }
+            @if (validUntil()) {
+              <span [class.text-slate-600]="isPrint()" [class.text-slate-500]="!isPrint()"> (30 jours)</span>
+            }
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Émetteur / Client -->
+  <div class="my-6 grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6">
+    <div
+      class="rounded-xl border p-4"
+      [class]="isPrint() ? 'border-slate-300 bg-slate-100' : 'border-slate-800 bg-slate-950/40'"
+    >
+      <span
+        class="mb-2 block text-[10px] font-bold uppercase tracking-wider"
+        [class.text-cyan-900]="isPrint()"
+        [class.text-cyan-500]="!isPrint()"
+        >Prestataire / Émetteur</span
+      >
+      @if (workspace(); as w) {
+        <div class="space-y-1 text-xs">
+          <p class="text-sm font-bold" [class.text-white]="!isPrint()" [class.text-slate-900]="isPrint()">{{ w.name }}</p>
+          @if (w.legalSubtitle) {
+            <p [class.text-slate-700]="isPrint()" [class.text-slate-400]="!isPrint()">{{ w.legalSubtitle }}</p>
+          }
+          @for (addr of issuerAddressLines(w); track $index) {
+            <p [class.text-slate-700]="isPrint()" [class.text-slate-400]="!isPrint()">{{ addr }}</p>
+          }
+          @if (w.contactEmail) {
+            <p [class.text-slate-700]="isPrint()" [class.text-slate-400]="!isPrint()">{{ w.contactEmail }}</p>
+          }
+          @if (w.websiteUrl) {
+            <p [class.text-slate-700]="isPrint()" [class.text-slate-400]="!isPrint()">{{ w.websiteUrl }}</p>
+          }
+          @if (issuerLegalLine(w)) {
+            <p class="font-mono text-[11px]" [class.text-slate-800]="isPrint()" [class.text-slate-500]="!isPrint()">
+              {{ issuerLegalLine(w) }}
+            </p>
+          }
+        </div>
+      }
+    </div>
+
+    <div
+      class="rounded-xl border p-4"
+      [class]="isPrint() ? 'border-slate-300 bg-slate-100' : 'border-slate-800 bg-slate-950/80'"
+    >
+      <span
+        class="mb-2 block text-[10px] font-bold uppercase tracking-wider"
+        [class.text-cyan-900]="isPrint()"
+        [class.text-cyan-500]="!isPrint()"
+        >Destinataire / Client</span
+      >
+      @if (customer(); as c) {
+        <div class="space-y-1 text-xs">
+          <p class="text-sm font-bold" [class.text-slate-900]="isPrint()" [class.text-white]="!isPrint()">
+            {{ customerTitle(c) }}
+          </p>
+          @if (customerContact(c)) {
+            <p [class.text-slate-700]="isPrint()" [class.text-slate-300]="!isPrint()">{{ customerContact(c) }}</p>
+          }
+          @if (customerAddress(c)) {
+            <p [class.text-slate-700]="isPrint()" [class.text-slate-400]="!isPrint()">{{ customerAddress(c) }}</p>
+          }
+          <p [class.text-slate-700]="isPrint()" [class.text-slate-400]="!isPrint()">
+            @if (c.email) {
+              {{ c.email }}
+            }
+            @if (c.email && c.phone) {
+              •
+            }
+            @if (c.phone) {
+              {{ c.phone }}
+            }
+          </p>
+        </div>
+      } @else {
+        <p class="text-xs" [class.text-slate-600]="isPrint()" [class.text-slate-500]="!isPrint()">
+          Sélectionnez un client dans l’éditeur.
+        </p>
+      }
+    </div>
+  </div>
+
+  <!-- Objet -->
+  <div
+    class="mb-6 rounded-xl border p-4"
+    [class]="isPrint() ? 'border-slate-300 bg-slate-100' : 'border-slate-800 bg-slate-950/60'"
+  >
+    <div class="space-y-2 text-xs">
+      <div class="flex flex-wrap items-center gap-2">
+        <span
+          class="text-[10px] font-bold uppercase tracking-wider"
+          [class.text-cyan-900]="isPrint()"
+          [class.text-cyan-500]="!isPrint()"
+          >Objet :</span
+        >
+        <span class="font-semibold" [class.text-slate-900]="isPrint()" [class.text-slate-100]="!isPrint()">{{
+          subject()
+        }}</span>
+      </div>
+      @if (executiveSummary()) {
+        <p class="leading-relaxed" [class.text-slate-800]="isPrint()" [class.text-slate-400]="!isPrint()">
+          {{ executiveSummary() }}
+        </p>
+      }
+    </div>
+  </div>
+
+  <!-- Tableau -->
+  <div class="my-6 overflow-x-auto">
+    <table class="w-full border-collapse text-left">
+      <thead>
+        <tr
+          class="border-b text-[10px] font-bold uppercase tracking-wider sm:text-[11px]"
+          [class]="
+            isPrint() ? 'border-slate-400 bg-slate-200 text-slate-900' : 'border-slate-800 bg-slate-950/80 text-slate-400'
+          "
+        >
+          <th class="w-24 px-2 py-2 sm:px-3 sm:py-3">Réf / SKU</th>
+          <th class="px-2 py-2 sm:px-3 sm:py-3">Prestation &amp; description</th>
+          <th class="w-16 px-2 py-2 text-center sm:px-3 sm:py-3">Qté</th>
+          <th class="w-24 px-2 py-2 text-right sm:px-3 sm:py-3">P.U HT</th>
+          <th class="hidden w-14 px-2 py-2 text-center sm:table-cell sm:px-3 sm:py-3">TVA</th>
+          <th class="w-24 px-2 py-2 text-right sm:px-3 sm:py-3">Total HT</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y text-xs" [class.divide-slate-200]="isPrint()" [class.divide-slate-800/80]="!isPrint()">
+        @for (line of lines(); track $index) {
+          <tr class="transition hover:bg-slate-500/5">
+            <td
+              class="align-top px-2 py-2 font-mono text-[10px] font-semibold sm:px-3 sm:py-3"
+              [class.text-slate-700]="isPrint()"
+              [class.text-slate-400]="!isPrint()"
+            >
+              {{ line.sku ?? '—' }}
+            </td>
+            <td class="space-y-1 align-top px-2 py-2 sm:px-3 sm:py-3">
+              <span class="font-bold" [class.text-slate-900]="isPrint()" [class.text-slate-100]="!isPrint()">{{
+                line.label
+              }}</span>
+              @if (line.detail) {
+                <p class="text-[11px] leading-relaxed" [class.text-slate-800]="isPrint()" [class.text-slate-400]="!isPrint()">
+                  {{ line.detail }}
+                </p>
+              }
+            </td>
+            <td class="align-top px-2 py-2 text-center font-mono sm:px-3 sm:py-3">
+              <span class="font-bold">{{ line.quantity }}</span>
+              <span class="block text-[10px]" [class.text-slate-600]="isPrint()" [class.text-slate-500]="!isPrint()">{{
+                line.unit
+              }}</span>
+            </td>
+            <td
+              class="align-top px-2 py-2 text-right font-mono sm:px-3 sm:py-3"
+              [class.text-slate-900]="isPrint()"
+            >
+              {{ formatMoney(line.unitPriceHt) }} €
+            </td>
+            <td
+              class="hidden align-top px-2 py-2 text-center font-mono sm:table-cell sm:px-3 sm:py-3"
+              [class.text-slate-700]="isPrint()"
+              [class.text-slate-400]="!isPrint()"
+            >
+              {{ line.vatRate }}%
+            </td>
+            <td
+              class="align-top px-2 py-2 text-right font-mono font-bold sm:px-3 sm:py-3"
+              [class.text-slate-900]="isPrint()"
+              [class.text-cyan-400]="!isPrint()"
+            >
+              {{ formatMoney(line.lineTotalHt) }} €
+            </td>
+          </tr>
+        } @empty {
+          <tr>
+            <td
+              colspan="6"
+              class="px-3 py-8 text-center"
+              [class.text-slate-700]="isPrint()"
+              [class.text-slate-500]="!isPrint()"
+            >
+              Aucune prestation dans le devis.
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Totaux & conditions -->
+  <div
+    class="my-6 grid grid-cols-1 gap-4 border-t pt-4 md:grid-cols-12 md:gap-6"
+    [class.border-slate-800]="!isPrint()"
+    [class.border-slate-300]="isPrint()"
+  >
+    <div class="space-y-4 md:col-span-7">
+      <div
+        class="space-y-2.5 rounded-xl border p-4 text-xs"
+        [class]="isPrint() ? 'border-slate-300 bg-slate-100' : 'border-slate-800 bg-slate-950/60'"
+      >
+        <span
+          class="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider"
+          [class.text-cyan-900]="isPrint()"
+          [class.text-cyan-500]="!isPrint()"
+        >
+          <app-lucide-icon name="credit-card" [size]="14" />
+          Conditions de règlement
+        </span>
+        <ul class="space-y-1.5" [class.text-slate-800]="isPrint()" [class.text-slate-400]="!isPrint()">
+          <li class="flex items-start gap-1.5">
+            <app-lucide-icon
+              name="circle-check"
+              [size]="14"
+              class="mt-0.5 shrink-0"
+              [class.text-emerald-700]="isPrint()"
+              [class.text-emerald-400]="!isPrint()"
+            />
+            <span
+              ><strong>Acompte exigé :</strong> {{ depositPercent() }}% à la commande ({{
+                formatMoney(depositAmount())
+              }}
+              € TTC).</span
+            >
+          </li>
+          <li class="flex items-start gap-1.5">
+            <app-lucide-icon
+              name="circle-check"
+              [size]="14"
+              class="mt-0.5 shrink-0"
+              [class.text-emerald-700]="isPrint()"
+              [class.text-emerald-400]="!isPrint()"
+            />
+            <span><strong>Solde :</strong> Paiement à 30 jours à compter de la livraison / recette finale.</span>
+          </li>
+          <li class="flex items-start gap-1.5">
+            <app-lucide-icon
+              name="circle-check"
+              [size]="14"
+              class="mt-0.5 shrink-0"
+              [class.text-emerald-700]="isPrint()"
+              [class.text-emerald-400]="!isPrint()"
+            />
+            <span><strong>Mode de paiement :</strong> Virement bancaire direct.</span>
+          </li>
+        </ul>
+        <div
+          class="space-y-0.5 border-t pt-2 font-mono text-[11px]"
+          [class.border-slate-300]="isPrint()"
+          [class.border-slate-800]="!isPrint()"
+          [class.text-slate-800]="isPrint()"
+          [class.text-slate-400]="!isPrint()"
+        >
+          <p><strong>Titulaire :</strong> {{ workspace()?.name ?? 'NERD GROUP' }}</p>
+          <p [class.text-slate-700]="isPrint()" [class.text-slate-500]="!isPrint()">
+            IBAN / BIC : à renseigner dans les paramètres workspace (à venir).
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <div class="md:col-span-5">
+      <div
+        class="space-y-2.5 rounded-xl border p-4 font-mono text-xs"
+        [class]="
+          isPrint() ? 'border-slate-300 bg-slate-100 text-slate-900' : 'border-slate-800 bg-slate-950/80 text-slate-200'
+        "
+      >
+        <div class="flex justify-between" [class.text-slate-700]="isPrint()" [class.text-slate-400]="!isPrint()">
+          <span>Total HT :</span>
+          <span>{{ totals().ht }}</span>
+        </div>
+        <div class="flex justify-between" [class.text-slate-700]="isPrint()" [class.text-slate-400]="!isPrint()">
+          <span>TVA :</span>
+          <span>{{ totals().vat }}</span>
+        </div>
+        <div
+          class="flex justify-between border-t pt-2 font-sans text-base font-bold"
+          [class.border-slate-300]="isPrint()"
+          [class.border-slate-800]="!isPrint()"
+          [class.text-slate-900]="isPrint()"
+          [class.text-cyan-400]="!isPrint()"
+        >
+          <span>TOTAL TTC :</span>
+          <span>{{ totals().ttc }}</span>
+        </div>
+        <div
+          class="space-y-1.5 border-t pt-3 text-[11px]"
+          [class.border-slate-300]="isPrint()"
+          [class.border-slate-800]="!isPrint()"
+        >
+          <div
+            class="flex justify-between font-semibold"
+            [class.text-emerald-800]="isPrint()"
+            [class.text-emerald-500]="!isPrint()"
+          >
+            <span>Acompte à la commande ({{ depositPercent() }}%) :</span>
+            <span>{{ formatMoney(depositAmount()) }} €</span>
+          </div>
+          <div
+            class="flex justify-between font-bold"
+            [class.text-slate-800]="isPrint()"
+            [class.text-slate-400]="!isPrint()"
+          >
+            <span>Solde restant à payer :</span>
+            <span>{{ formatMoney(balanceDue()) }} €</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  @if (!embedded()) {
+    <div
+      class="mt-8 rounded-xl border p-5 sm:p-6"
+      [class]="isPrint() ? 'border-slate-300 bg-slate-100' : 'border-slate-800 bg-slate-950/40'"
+    >
+      <div class="flex flex-col items-start justify-between gap-6 sm:flex-row sm:gap-8">
+        <div class="max-w-sm space-y-2">
+          <h4 class="text-sm font-bold" [class.text-slate-900]="isPrint()" [class.text-white]="!isPrint()">
+            Bon pour accord &amp; validation
+          </h4>
+          <p
+            class="text-xs leading-relaxed"
+            [class.text-slate-800]="isPrint()"
+            [class.text-slate-400]="!isPrint()"
+          >
+            En signant ce devis, le client reconnaît avoir pris connaissance et accepté l'intégralité des prestations
+            et des conditions de règlement ci-dessus.
+          </p>
+          <p class="pt-2 text-[11px]" [class.text-slate-700]="isPrint()" [class.text-slate-500]="!isPrint()">
+            Date d'approbation :
+            <span
+              class="font-mono font-bold"
+              [class.text-slate-900]="isPrint()"
+              [class.text-slate-300]="!isPrint()"
+              >{{ signatureDate() || 'En attente…' }}</span
+            >
+          </p>
+        </div>
+        <div class="w-full sm:w-auto">
+          <div class="mb-1.5 flex items-center justify-between">
+            <span
+              class="flex items-center gap-1 text-xs font-semibold"
+              [class.text-slate-700]="isPrint()"
+              [class.text-slate-400]="!isPrint()"
+            >
+              <app-lucide-icon
+                name="pen-tool"
+                [size]="14"
+                [class.text-cyan-800]="isPrint()"
+                [class.text-cyan-400]="!isPrint()"
+              />
+              Signature du client :
+            </span>
+            @if (hasSignature()) {
+              <button
+                type="button"
+                class="flex items-center gap-1 text-[10px] text-rose-400 hover:underline print:hidden"
+                (click)="clearSignature()"
+              >
+                <app-lucide-icon name="refresh-cw" [size]="12" />
+                Effacer
+              </button>
+            }
+          </div>
+          <div
+            class="signature-pad relative overflow-hidden rounded-xl border-2 border-dashed"
+            [class.border-emerald-600]="hasSignature() && isPrint()"
+            [class.bg-emerald-50]="hasSignature() && isPrint()"
+            [class.border-emerald-500/50]="hasSignature() && !isPrint()"
+            [class.bg-emerald-500/5]="hasSignature() && !isPrint()"
+            [class.border-slate-500]="!hasSignature() && isPrint()"
+            [class.border-slate-700]="!hasSignature() && !isPrint()"
+            [class.bg-slate-950/80]="!hasSignature() && !isPrint()"
+          >
+            <canvas
+              #signatureCanvas
+              class="w-full touch-none cursor-crosshair sm:w-[280px]"
+              (mousedown)="startSigning($event)"
+              (mousemove)="drawSignature($event)"
+              (mouseup)="stopSigning()"
+              (mouseleave)="stopSigning()"
+              (touchstart)="startSigning($event)"
+              (touchmove)="drawSignature($event)"
+              (touchend)="stopSigning()"
+            ></canvas>
+            @if (!hasSignature()) {
+              <div
+                class="signature-placeholder pointer-events-none absolute inset-0 flex items-center justify-center font-mono text-xs"
+                [class.text-slate-400]="!isPrint()"
+                [class.opacity-40]="!isPrint()"
+              >
+                Signer à la souris ou au doigt
+              </div>
+            }
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div
+      class="mt-8 space-y-1 border-t pt-4 text-center text-[10px]"
+      [class.border-slate-300]="isPrint()"
+      [class.border-slate-800]="!isPrint()"
+      [class.text-slate-700]="isPrint()"
+      [class.text-slate-500]="!isPrint()"
+    >
+      @if (workspace(); as w) {
+        <p class="font-semibold">
+          {{ w.name }}@if (issuerAddressOneLine(w)) {
+            • {{ issuerAddressOneLine(w) }}
+          }
+        </p>
+        @if (issuerLegalLine(w)) {
+          <p>{{ issuerLegalLine(w) }} • {{ w.contactEmail }} • {{ w.websiteUrl }}</p>
+        }
+      }
+      <p class="text-[9px]" [class.text-slate-600]="isPrint()" [class.opacity-70]="!isPrint()">
+        Escompte pour paiement anticipé : néant. En cas de retard de paiement, pénalités au taux annuel de 12% et
+        indemnité forfaitaire pour frais de recouvrement de 40€.
+      </p>
+    </div>
+  }
+</div>

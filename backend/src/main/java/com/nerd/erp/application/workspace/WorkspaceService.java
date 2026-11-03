@@ -3,6 +3,7 @@ package com.nerd.erp.application.workspace;
 import com.nerd.erp.infrastructure.security.core.SecurityContextHelper;
 import com.nerd.erp.api.error.ApiException;
 import com.nerd.erp.api.workspace.WorkspaceCreateRequest;
+import com.nerd.erp.api.workspace.WorkspaceUpdateRequest;
 import com.nerd.erp.application.etsysync.EtsySyncSessionStore;
 import com.nerd.erp.application.tenancy.TenantAccessService;
 import com.nerd.erp.domain.organization.Organization;
@@ -80,6 +81,32 @@ public class WorkspaceService {
     }
 
     @Transactional
+    public WorkspaceResponse update(UUID workspaceId, WorkspaceUpdateRequest request) {
+        SecurityContextHelper.requireAdminAccess();
+        UUID tenantId = SecurityContextHelper.requireTenantId();
+        Workspace ws = tenantAccessService.requireWorkspace(workspaceId, tenantId);
+
+        ws.setName(request.name().trim());
+        ws.setLegalSubtitle(trimToNull(request.legalSubtitle()));
+        ws.setAddressLine1(trimToNull(request.addressLine1()));
+        ws.setAddressLine2(trimToNull(request.addressLine2()));
+        ws.setPostalCode(trimToNull(request.postalCode()));
+        ws.setCity(trimToNull(request.city()));
+        ws.setRegion(trimToNull(request.region()));
+        ws.setCountryCode(request.countryCode().trim().toUpperCase());
+        ws.setContactEmail(trimToNull(request.contactEmail()));
+        ws.setWebsiteUrl(trimToNull(request.websiteUrl()));
+        ws.setSiren(trimToNull(request.siren()));
+        ws.setVatNumber(trimToNull(request.vatNumber()));
+        ws.setCurrencyCode(request.currencyCode().trim().toUpperCase());
+        ws.setInvoicePrefix(request.invoicePrefix().trim());
+        ws.setQuotationPrefix(request.quotationPrefix().trim());
+
+        ws = workspaceRepository.save(ws);
+        return toResponse(ws);
+    }
+
+    @Transactional
     public void delete(UUID workspaceId) {
         SecurityContextHelper.requireAdminAccess();
         UUID tenantId = SecurityContextHelper.requireTenantId();
@@ -132,8 +159,35 @@ public class WorkspaceService {
         return value == null || value.isBlank() ? defaultValue : value.trim();
     }
 
+    private static String trimToNull(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value.trim();
+    }
+
     private WorkspaceResponse toResponse(Workspace w) {
-        return new WorkspaceResponse(w.getId(), w.getName(), w.getSlug(), w.getOrganizationId(),
-                w.getCurrencyCode(), w.getBrandColor(), w.getLogoUrl(), w.isActive());
+        return new WorkspaceResponse(
+                w.getId(),
+                w.getName(),
+                w.getSlug(),
+                w.getOrganizationId(),
+                w.getCurrencyCode(),
+                w.getBrandColor(),
+                w.getLogoUrl(),
+                w.isActive(),
+                w.getLegalSubtitle(),
+                w.getAddressLine1(),
+                w.getAddressLine2(),
+                w.getPostalCode(),
+                w.getCity(),
+                w.getRegion(),
+                w.getCountryCode(),
+                w.getContactEmail(),
+                w.getWebsiteUrl(),
+                w.getSiren(),
+                w.getVatNumber(),
+                w.getInvoicePrefix(),
+                w.getQuotationPrefix());
     }
 }

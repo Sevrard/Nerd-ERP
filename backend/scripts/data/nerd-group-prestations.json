@@ -1,0 +1,184 @@
+{
+  "currency": "EUR",
+  "vat_rate_default": 20.0,
+  "categories": [
+    {
+      "code": "CADRAGE",
+      "label": "1. Cadrage & Conception",
+      "items": [
+        {
+          "sku": "PREST-CAD-001",
+          "label": "Atelier de cadrage & Spécifications fonctionnelles",
+          "description": "Atelier d'expression des besoins, clarification des workflows métiers et rédaction du cahier des charges fonctionnel.",
+          "billing_type": "DAYS",
+          "unit_price_ht": 550.00,
+          "default_quantity": 2.0,
+          "unit_label": "jours",
+          "is_optional_default": false
+        },
+        {
+          "sku": "PREST-CAD-002",
+          "label": "Conception UX/UI & Prototypage interactif",
+          "description": "Création des maquettes Figma, parcours utilisateurs et prototyps interactifs avant phase de dev.",
+          "billing_type": "DAYS",
+          "unit_price_ht": 550.00,
+          "default_quantity": 3.0,
+          "unit_label": "jours",
+          "is_optional_default": false
+        }
+      ]
+    },
+    {
+      "code": "DEV_BACKEND",
+      "label": "2. Architecture & Back-End",
+      "items": [
+        {
+          "sku": "PREST-BACK-001",
+          "label": "Architecture API REST / Microservices (Spring Boot)",
+          "description": "Mise en place du socle applicatif Spring Boot (Java 21), modélisation des entités JPA, migrations Flyway/Liquibase.",
+          "billing_type": "DAYS",
+          "unit_price_ht": 550.00,
+          "default_quantity": 4.0,
+          "unit_label": "jours",
+          "is_optional_default": false
+        },
+        {
+          "sku": "PREST-BACK-002",
+          "label": "Sécurité, Authentification & Rôles (JWT / OAuth2)",
+          "description": "Implémentation de Spring Security, gestion des tokens JWT, contrôle d'accès par rôles (RBAC).",
+          "billing_type": "FIXED_PRICE",
+          "unit_price_ht": 1100.00,
+          "default_quantity": 1.0,
+          "unit_label": "forfait",
+          "is_optional_default": false
+        },
+        {
+          "sku": "PREST-BACK-003",
+          "label": "Base de données & Optimisation PostgreSQL",
+          "description": "Création du schéma de BDD, indexation, procédures stockées et optimisation des requêtes.",
+          "billing_type": "DAYS",
+          "unit_price_ht": 550.00,
+          "default_quantity": 2.0,
+          "unit_label": "jours",
+          "is_optional_default": false
+        }
+      ]
+    },
+    {
+      "code": "DEV_FRONTEND",
+      "label": "3. Front-End & Interface Utilisateur",
+      "items": [
+        {
+          "sku": "PREST-FRONT-001",
+          "label": "Intégration Design System (Angular & Tailwind CSS)",
+          "description": "Mise en place de la charte graphique, composants réutilisables UI, responsive design.",
+          "billing_type": "DAYS",
+          "unit_price_ht": 550.00,
+          "default_quantity": 3.0,
+          "unit_label": "jours",
+          "is_optional_default": false
+        },
+        {
+          "sku": "PREST-FRONT-002",
+          "label": "Développement des vues & modules métiers",
+          "description": "Développement des formulaires dynamiques, tableaux de bord, gestion d'états (RxJS/Signals).",
+          "billing_type": "DAYS",
+          "unit_price_ht": 550.00,
+          "default_quantity": 6.0,
+          "unit_label": "jours",
+          "is_optional_default": false
+        }
+      ]
+    },
+    {
+      "code": "INTEGRATION_TIERS",
+      "label": "4. Connecteurs & Intégrations Tiers",
+      "items": [
+        {
+          "sku": "PREST-INT-001",
+          "label": "Module de Paiement (Stripe / Billing)",
+          "description": "Intégration des paiements par CB, webhooks d'événements, gestion des abonnements et reçus.",
+          "billing_type": "FIXED_PRICE",
+          "unit_price_ht": 950.00,
+          "default_quantity": 1.0,
+          "unit_label": "forfait",
+          "is_optional_default": true
+        },
+        {
+          "sku": "PREST-INT-002",
+          "label": "Connecteur E-Commerce / CRM (Shopify, PrestaShop, Salesforce)",
+          "description": "Synchronisation bidirectionnelle des produits, stocks, clients et commandes via API REST.",
+          "billing_type": "DAYS",
+          "unit_price_ht": 550.00,
+          "default_quantity": 3.0,
+          "unit_label": "jours",
+          "is_optional_default": true
+        },
+        {
+          "sku": "PREST-INT-003",
+          "label": "Envoi automatisé E-mails / SMS (Twilio / Brevo)",
+          "description": "Configuration des templates transactionnels, notifications temps réel et logs d'envoi.",
+          "billing_type": "FIXED_PRICE",
+          "unit_price_ht": 450.00,
+          "default_quantity": 1.0,
+          "unit_label": "forfait",
+          "is_optional_default": true
+        }
+      ]
+    },
+    {
+      "code": "DEVOPS_QUALITE",
+      "label": "5. DevOps, Recette & Livrables",
+      "items": [
+        {
+          "sku": "PREST-DEV-001",
+          "label": "Configuration Docker, SSL & Cloudflare",
+          "description": "Containerisation des services, certificats SSL Let's Encrypt, tunnel HTTPS sécurisé.",
+          "billing_type": "FIXED_PRICE",
+          "unit_price_ht": 650.00,
+          "default_quantity": 1.0,
+          "unit_label": "forfait",
+          "is_optional_default": false
+        },
+        {
+          "sku": "PREST-DEV-002",
+          "label": "Tests automatisés (Cypress / Jasmine) & Recette",
+          "description": "Écriture des suites de tests unitaires et E2E, accompagnement aux tests utilisateurs.",
+          "billing_type": "DAYS",
+          "unit_price_ht": 550.00,
+          "default_quantity": 2.0,
+          "unit_label": "jours",
+          "is_optional_default": false
+        }
+      ]
+    },
+    {
+      "code": "MAINTENANCE_HEBERGEMENT",
+      "label": "6. Maintenance & Hébergement (Récurrent)",
+      "items": [
+        {
+          "sku": "PREST-REC-001",
+          "label": "Tierce Maintenance Applicative (TMA - 4h/mois)",
+          "description": "Correction de bugs, mises à jour de sécurité des dépendances, petit soutien technique.",
+          "billing_type": "RECURRING",
+          "billing_cycle": "MONTHLY",
+          "unit_price_ht": 220.00,
+          "default_quantity": 12.0,
+          "unit_label": "mois",
+          "is_optional_default": true
+        },
+        {
+          "sku": "PREST-REC-002",
+          "label": "Hébergement Managé & Sauvegardes automatisées",
+          "description": "Hébergement dédié/VPS, monitoring uptime 24/7, sauvegardes quotidiennes de la base de données.",
+          "billing_type": "RECURRING",
+          "billing_cycle": "MONTHLY",
+          "unit_price_ht": 75.00,
+          "default_quantity": 12.0,
+          "unit_label": "mois",
+          "is_optional_default": true
+        }
+      ]
+    }
+  ]
+}
