@@ -321,6 +321,11 @@
               [class.text-slate-900]="isPrint()"
             >
               {{ formatMoney(line.unitPriceHt) }} €
+              @if (line.discountPercent > 0) {
+                <span class="block text-[10px]" [class.text-rose-700]="isPrint()" [class.text-rose-400]="!isPrint()">
+                  remise -{{ line.discountPercent }} %
+                </span>
+              }
             </td>
             <td
               class="hidden align-top px-2 py-2 text-center font-mono sm:table-cell sm:px-3 sm:py-3"
@@ -465,10 +470,19 @@
           <span>Total HT :</span>
           <span>{{ totals().ht }}</span>
         </div>
-        <div class="flex justify-between" [class.text-slate-700]="isPrint()" [class.text-slate-400]="!isPrint()">
-          <span>TVA :</span>
-          <span>{{ totals().vat }}</span>
-        </div>
+        @if (totals().vatLines.length > 1) {
+          @for (v of totals().vatLines; track v.rate) {
+            <div class="flex justify-between" [class.text-slate-700]="isPrint()" [class.text-slate-400]="!isPrint()">
+              <span>TVA {{ formatRate(v.rate) }} (base {{ formatMoney(v.baseHt) }} €) :</span>
+              <span>{{ formatMoney(v.vatAmount) }} €</span>
+            </div>
+          }
+        } @else {
+          <div class="flex justify-between" [class.text-slate-700]="isPrint()" [class.text-slate-400]="!isPrint()">
+            <span>TVA{{ totals().vatLines.length === 1 ? ' ' + formatRate(totals().vatLines[0].rate) : '' }} :</span>
+            <span>{{ totals().vat }}</span>
+          </div>
+        }
         <div
           class="flex justify-between border-t pt-2 font-sans text-base font-bold"
           [class.border-slate-300]="isPrint()"

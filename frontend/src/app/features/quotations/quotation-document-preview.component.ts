@@ -21,6 +21,7 @@ import {
 } from '../../core/workspace/workspace-issuer.util';
 import { Workspace } from '../../shared/models/workspace.model';
 import { formatPriceHt } from '../products/product-catalog.util';
+import { formatRate } from '../../shared/utils/money.util';
 import { EMPTY_PREVIEW_TOTALS, QuotationPreviewLine, QuotationPreviewTotals } from './quotation-preview.model';
 
 export type QuotationPreviewViewMode = 'screen' | 'print';
@@ -137,6 +138,10 @@ export class QuotationDocumentPreviewComponent implements AfterViewInit {
 
   formatMoney(value: number): string {
     return formatPriceHt(value);
+  }
+
+  formatRate(rate: number): string {
+    return formatRate(rate);
   }
 
   isPrint(): boolean {

@@ -437,25 +437,107 @@
                     </button>
                   </div>
                 }
+                @if (quotation()?.status === 'DRAFT' || quotation()?.status === 'SENT') {
+                  <div class="flex flex-wrap items-center gap-2 pt-2">
+                    <button
+                      type="button"
+                      class="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
+                      [disabled]="form.invalid || actionBusy() || saving()"
+                      (click)="openEmailDialog()"
+                    >
+                      <app-lucide-icon name="mail" [size]="16" />
+                      {{ quotation()?.sentAt ? 'Renvoyer au client par e-mail' : 'Envoyer au client par e-mail' }}
+                    </button>
+                    @if (quotation()?.sentAt) {
+                      <span class="text-xs text-slate-500">
+                        Envoyé le {{ quotation()!.sentAt | date: 'short' }}
+                        @if (quotation()?.publicLinkActive) {
+                          · lien d'acceptation actif
+                        }
+                      </span>
+                    }
+                  </div>
+                }
                 @if (quotation()?.status === 'SENT') {
-                  <button
-                    type="button"
-                    class="rounded-lg border border-cyan-500/50 px-4 py-2 text-sm text-cyan-300 hover:bg-cyan-950 disabled:opacity-50"
-                    [disabled]="actionBusy()"
-                    (click)="runAction('accept')"
-                  >
-                    Marquer comme accepté
-                  </button>
+                  <div class="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      class="rounded-lg border border-cyan-500/50 px-4 py-2 text-sm text-cyan-300 hover:bg-cyan-950 disabled:opacity-50"
+                      [disabled]="actionBusy()"
+                      (click)="runAction('accept')"
+                    >
+                      Marquer comme accepté
+                    </button>
+                    <button
+                      type="button"
+                      class="rounded-lg border border-rose-500/40 px-4 py-2 text-sm text-rose-300 hover:bg-rose-950/40 disabled:opacity-50"
+                      [disabled]="actionBusy()"
+                      (click)="rejectManually()"
+                    >
+                      Marquer comme refusé
+                    </button>
+                  </div>
+                }
+                @if (quotation()?.decidedAt) {
+                  <p class="rounded-lg border border-slate-800 bg-slate-950/60 px-3 py-2 text-xs text-slate-400">
+                    {{ quotation()!.status === 'REJECTED' ? 'Refusé' : 'Accepté' }}
+                    le {{ quotation()!.decidedAt | date: 'short' }}
+                    @if (quotation()!.decidedBy) {
+                      par {{ quotation()!.decidedBy }}
+                    }
+                    ({{ quotation()!.decisionSource === 'ONLINE' ? 'en ligne via le lien du devis' : 'saisie manuelle' }})
+                    @if (quotation()!.decisionComment) {
+                      — « {{ quotation()!.decisionComment }} »
+                    }
+                  </p>
                 }
                 @if (quotation()?.status === 'ACCEPTED') {
-                  <button
-                    type="button"
-                    class="rounded-lg bg-emerald-600 px-4 py-2 text-sm text-white hover:bg-emerald-500 disabled:opacity-50"
-                    [disabled]="actionBusy()"
-                    (click)="runAction('convert')"
-                  >
-                    Convertir en facture
-                  </button>
+                  <div class="flex flex-wrap items-center gap-2">
+                    @if (canInvoiceDeposit()) {
+                      <button
+                        type="button"
+                        class="inline-flex items-center gap-2 rounded-lg border border-amber-500/50 px-4 py-2 text-sm text-amber-300 hover:bg-amber-950/40 disabled:opacity-50"
+                        [disabled]="actionBusy()"
+                        (click)="createDepositInvoice()"
+                      >
+                        <app-lucide-icon name="wallet" [size]="16" />
+                        Facturer l'acompte ({{ quotation()!.depositPercent }} %)
+                      </button>
+                    }
+                    <button
+                      type="button"
+                      class="rounded-lg bg-emerald-600 px-4 py-2 text-sm text-white hover:bg-emerald-500 disabled:opacity-50"
+                      [disabled]="actionBusy()"
+                      (click)="runAction('convert')"
+                    >
+                      {{ quotation()?.depositInvoiceId ? 'Facturer le solde' : 'Convertir en facture' }}
+                    </button>
+                  </div>
+                }
+                @if (quotation()?.depositInvoiceId) {
+                  <p class="text-xs text-slate-400">
+                    Acompte facturé :
+                    <a
+                      [routerLink]="['/invoices', quotation()!.depositInvoiceId]"
+                      class="font-mono text-cyan-300 hover:underline"
+                    >
+                      {{ quotation()!.depositInvoiceNumber }}
+                    </a>
+                    — il sera déduit de la facture de solde.
+                  </p>
+                }
+                @if (quotationId) {
+                  <div class="flex flex-wrap gap-2 border-t border-slate-800 pt-3">
+                    <button
+                      type="button"
+                      class="inline-flex items-center gap-2 rounded-lg border border-slate-700 px-3 py-1.5 text-xs text-slate-300 hover:bg-slate-800 disabled:opacity-50"
+                      [disabled]="actionBusy() || saving()"
+                      (click)="duplicate()"
+                    >
+                      <app-lucide-icon name="copy" [size]="14" />
+                      Dupliquer ce devis
+                    </button>
+                  </div>
                 }
               </section>
           </div>
@@ -667,6 +749,17 @@
                                 formControlName="vatRate"
                                 class="w-14 rounded border border-slate-800 bg-slate-950 px-2 py-0.5 text-right font-mono text-xs text-slate-300 focus:border-cyan-500/50 focus:outline-none"
                               />
+                              <span>% · remise</span>
+                              <input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                max="100"
+                                formControlName="discountPercent"
+                                aria-label="Remise de ligne en %"
+                                class="w-14 rounded border border-slate-800 bg-slate-950 px-2 py-0.5 text-right font-mono text-xs text-slate-300 focus:border-cyan-500/50 focus:outline-none"
+                                [class.text-amber-300]="lineDiscount(i) > 0"
+                              />
                               <span>%</span>
                             </div>
                           </div>
@@ -758,5 +851,17 @@
         }
       </div>
     </div>
+  }
+
+  @if (emailDialogOpen()) {
+    <app-document-email-dialog
+      title="Envoyer le devis au client"
+      subtitle="Le PDF est joint et le client reçoit un lien pour accepter ou refuser le devis en ligne. Un brouillon est d'abord numéroté et marqué comme envoyé."
+      [defaultTo]="selectedCustomer()?.email ?? null"
+      [busy]="emailBusy()"
+      [error]="emailError()"
+      (send)="sendEmail($event)"
+      (close)="emailDialogOpen.set(false)"
+    />
   }
 </div>

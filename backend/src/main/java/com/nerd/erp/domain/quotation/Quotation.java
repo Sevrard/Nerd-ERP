@@ -13,6 +13,7 @@ import lombok.Getter;
 import lombok.Setter;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -68,6 +69,28 @@ public class Quotation extends TenantScopedEntity {
 
     @Column(name = "converted_invoice_id")
     private UUID convertedInvoiceId;
+
+    /** Dernier envoi par e-mail au client. */
+    @Column(name = "sent_at")
+    private Instant sentAt;
+
+    /** SHA-256 du jeton du lien public d'acceptation (jamais le jeton brut). */
+    @Column(name = "public_token_hash", length = 64)
+    private String publicTokenHash;
+
+    @Column(name = "decided_at")
+    private Instant decidedAt;
+
+    /** Nom saisi par le client (en ligne) ou de l'utilisateur ayant saisi la décision. */
+    @Column(name = "decided_by", length = 255)
+    private String decidedBy;
+
+    @Column(name = "decision_comment", length = 1024)
+    private String decisionComment;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "decision_source", length = 20)
+    private QuotationDecisionSource decisionSource;
 
     @OneToMany(mappedBy = "quotation", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("lineOrder ASC")

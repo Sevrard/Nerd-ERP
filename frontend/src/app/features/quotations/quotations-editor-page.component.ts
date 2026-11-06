@@ -1,3 +1,4 @@
+import { DatePipe } from '@angular/common';
 import { Component, computed, effect, inject, OnInit, signal, untracked } from '@angular/core';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { FormArray, FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
@@ -24,10 +25,12 @@ import { Product } from '../../shared/models/product.model';
 import { SEARCH_SELECT_LIMIT } from '../../shared/ui/search-select.component';
 import { ProductCategory } from '../../shared/models/product-category.model';
 import { Quotation, QuotationPayload } from '../../shared/models/quotation.model';
-import { formatMoney, lineTotals } from '../../shared/utils/money.util';
+import { formatMoney, lineTotals, vatBreakdown } from '../../shared/utils/money.util';
 import { ErrorBannerComponent } from '../../shared/ui/error-banner.component';
 import { LoadingStateComponent } from '../../shared/ui/loading-state.component';
 import { LucideIconComponent } from '../../shared/ui/lucide-icon.component';
+import { DocumentEmailDialogComponent } from '../../shared/ui/document-email-dialog.component';
+import { DocumentEmailPayload } from '../../shared/models/invoice.model';
 import { QuotationsApiService } from './quotations-api.service';
 import { QuotationDocumentPreviewComponent, QuotationPreviewViewMode } from './quotation-document-preview.component';
 import { QuotationPreviewLine, QuotationPreviewTotals } from './quotation-preview.model';
@@ -44,10 +47,12 @@ const CATALOG_PAGE_SIZE = 50;
   imports: [
     ReactiveFormsModule,
     RouterLink,
+    DatePipe,
     ErrorBannerComponent,
     LoadingStateComponent,
     LucideIconComponent,
     QuotationDocumentPreviewComponent,
+    DocumentEmailDialogComponent,
   ],
   templateUrl: './quotations-editor-page.component.html',
 })
@@ -91,6 +96,9 @@ export class QuotationsEditorPageComponent implements OnInit {
   readonly previewViewMode = signal<QuotationPreviewViewMode>('screen');
   readonly lineEditorOpen = signal(true);
   readonly toast = signal<string | null>(null);
+  readonly emailDialogOpen = signal(false);
+  readonly emailBusy = signal(false);
+  readonly emailError = signal<string | null>(null);
 
   /** Acompte proposé par défaut sur un nouveau devis (% du TTC). */
   private static readonly DEFAULT_DEPOSIT_PERCENT = 30;
@@ -318,6 +326,65 @@ export class QuotationsEditorPageComponent implements OnInit {
     }
   }
 
+  /** Ouvre la modale d'envoi ; un brouillon modifié est d'abord enregistré. */
+  openEmailDialog(): void {
+    this.emailError.set(null);
+    const q = this.quotation();
+    if (q && q.status !== 'DRAFT') {
+      this.emailDialogOpen.set(true);
+      return;
+    }
+    if (this.form.dirty || !this.quotationId) {
+      this.saveDraftInternal(() => this.emailDialogOpen.set(true));
+      return;
+    }
+    this.emailDialogOpen.set(true);
+  }
+
+  sendEmail(payload: DocumentEmailPayload): void {
+    if (!this.quotationId || this.emailBusy()) {
+      return;
+    }
+    this.emailBusy.set(true);
+    this.emailError.set(null);
+    const id = this.quotationId;
+    this.api.sendByEmail(id, payload).subscribe({
+      next: (result) => {
+        this.emailBusy.set(false);
+        this.emailDialogOpen.set(false);
+        this.notify(`Devis envoyé à ${result.to}`);
+        this.loadQuotation(id);
+      },
+      error: (err) => {
+        this.emailError.set(apiErrorMessage(err, 'Envoi impossible'));
+        this.emailBusy.set(false);
+      },
+    });
+  }
+
+  rejectManually(): void {
+    if (!this.quotationId || this.actionBusy()) {
+      return;
+    }
+    const reason = window.prompt('Motif du refus (optionnel) :', '');
+    if (reason === null) {
+      return;
+    }
+    this.actionBusy.set(true);
+    this.error.set(null);
+    this.api.reject(this.quotationId, reason.trim() || null).subscribe({
+      next: (q) => {
+        this.quotation.set(q);
+        this.actionBusy.set(false);
+        this.notify('Devis marqué comme refusé');
+      },
+      error: (err) => {
+        this.error.set(apiErrorMessage(err, 'Refus impossible'));
+        this.actionBusy.set(false);
+      },
+    });
+  }
+
   customerLabel(c: Customer): string {
     return customerDisplayName(c);
   }
@@ -408,7 +475,14 @@ export class QuotationsEditorPageComponent implements OnInit {
 
   lineHt(index: number): string {
     const g = this.lines.at(index).getRawValue();
-    return formatMoney(lineTotals(Number(g.quantity), Number(g.unitPriceHt), Number(g.vatRate)).ht);
+    return formatMoney(
+      lineTotals(Number(g.quantity), Number(g.unitPriceHt), Number(g.vatRate), this.lineDiscount(index)).ht,
+    );
+  }
+
+  /** Remise de ligne (%), bornée 0–100. */
+  lineDiscount(index: number): number {
+    return this.clampPercent(this.lines.at(index).get('discountPercent')?.value);
   }
 
   discountPercentValue(): number {
@@ -427,10 +501,17 @@ export class QuotationsEditorPageComponent implements OnInit {
     const raw = this.lines.getRawValue();
     let grossHt = 0;
     let grossVat = 0;
+    const rated: { vatRate: number; ht: number }[] = [];
     for (const l of raw) {
-      const t = lineTotals(Number(l.quantity), Number(l.unitPriceHt), Number(l.vatRate));
+      const t = lineTotals(
+        Number(l.quantity),
+        Number(l.unitPriceHt),
+        Number(l.vatRate),
+        this.clampPercent(l.discountPercent),
+      );
       grossHt += t.ht;
       grossVat += t.vat;
+      rated.push({ vatRate: Number(l.vatRate) || 0, ht: t.ht });
     }
     const pct = this.discountPercentValue();
     const discount = Math.round(grossHt * pct) / 100;
@@ -448,6 +529,7 @@ export class QuotationsEditorPageComponent implements OnInit {
       htNum: ht,
       vatNum: vat,
       ttcNum: ttc,
+      vatLines: vatBreakdown(rated, pct),
     };
   }
 
@@ -499,12 +581,13 @@ export class QuotationsEditorPageComponent implements OnInit {
         this.lines.removeAt(0);
       }
       this.lines.push(
-        this.fb.nonNullable.group({
-          productId: [product.id],
-          description: [product.name, Validators.required],
-          quantity: [1, [Validators.required, Validators.min(0.0001)]],
-          unitPriceHt: [product.unitPriceHt, [Validators.required, Validators.min(0)]],
-          vatRate: [product.vatRate, [Validators.required, Validators.min(0)]],
+        this.lineGroup({
+          productId: product.id,
+          description: product.name,
+          quantity: 1,
+          unitPriceHt: product.unitPriceHt,
+          vatRate: product.vatRate,
+          discountPercent: 0,
         }),
       );
     }
@@ -537,12 +620,13 @@ export class QuotationsEditorPageComponent implements OnInit {
           this.lines.removeAt(0);
         }
         this.lines.push(
-          this.fb.nonNullable.group({
-            productId: [product.id],
-            description: [product.name, Validators.required],
-            quantity: [item.quantity, [Validators.required, Validators.min(0.0001)]],
-            unitPriceHt: [product.unitPriceHt, [Validators.required, Validators.min(0)]],
-            vatRate: [product.vatRate, [Validators.required, Validators.min(0)]],
+          this.lineGroup({
+            productId: product.id,
+            description: product.name,
+            quantity: item.quantity,
+            unitPriceHt: product.unitPriceHt,
+            vatRate: product.vatRate,
+            discountPercent: 0,
           }),
         );
       }
@@ -565,6 +649,54 @@ export class QuotationsEditorPageComponent implements OnInit {
     }
     const qty = Math.max(0.0001, parseFloat(raw) || 1);
     this.lines.at(index).patchValue({ quantity: qty });
+  }
+
+  /** Copie le devis courant en nouveau brouillon et l'ouvre. */
+  duplicate(): void {
+    if (!this.quotationId || this.actionBusy()) {
+      return;
+    }
+    this.actionBusy.set(true);
+    this.error.set(null);
+    this.api.duplicate(this.quotationId).subscribe({
+      next: (copy) => {
+        this.actionBusy.set(false);
+        this.quotationId = copy.id;
+        this.quotation.set(copy);
+        this.patchForm(copy);
+        this.ensureProductsLoaded(copy.lines.map((l) => l.productId));
+        void this.router.navigate(['/quotations', copy.id]);
+        this.notify('Devis dupliqué : nouveau brouillon');
+      },
+      error: (err) => {
+        this.error.set(apiErrorMessage(err, 'Duplication impossible'));
+        this.actionBusy.set(false);
+      },
+    });
+  }
+
+  /** Acompte facturable : devis accepté, acompte prévu, pas encore facturé. */
+  canInvoiceDeposit(): boolean {
+    const q = this.quotation();
+    return !!q && q.status === 'ACCEPTED' && Number(q.depositPercent) > 0 && !q.depositInvoiceId;
+  }
+
+  createDepositInvoice(): void {
+    if (!this.quotationId || this.actionBusy()) {
+      return;
+    }
+    this.actionBusy.set(true);
+    this.error.set(null);
+    this.api.createDepositInvoice(this.quotationId).subscribe({
+      next: (inv) => {
+        this.actionBusy.set(false);
+        void this.router.navigate(['/invoices', inv.id]);
+      },
+      error: (err) => {
+        this.error.set(apiErrorMessage(err, "Facture d'acompte impossible"));
+        this.actionBusy.set(false);
+      },
+    });
   }
 
   removeLine(index: number): void {
@@ -715,6 +847,8 @@ export class QuotationsEditorPageComponent implements OnInit {
       const product = this.productById(productId);
       const quantity = this.lineQuantity(i);
       const unitPriceHt = this.lineUnitPrice(i);
+      const vatRate = Number(this.lines.at(i).get('vatRate')?.value) || 0;
+      const discountPercent = this.lineDiscount(i);
       rows.push({
         sku: this.lineProductRef(i),
         label,
@@ -722,8 +856,9 @@ export class QuotationsEditorPageComponent implements OnInit {
         quantity,
         unit: this.unitLabelForLine(i),
         unitPriceHt,
-        vatRate: Number(this.lines.at(i).get('vatRate')?.value) || 0,
-        lineTotalHt: quantity * unitPriceHt,
+        vatRate,
+        discountPercent,
+        lineTotalHt: lineTotals(quantity, unitPriceHt, vatRate, discountPercent).ht,
       });
     }
     return rows;
@@ -919,15 +1054,25 @@ export class QuotationsEditorPageComponent implements OnInit {
     this.lines.clear();
     const source = q.lines.length
       ? q.lines
-      : [{ productId: null as string | null, description: '', quantity: 1, unitPriceHt: 0, vatRate: 20 }];
+      : [
+          {
+            productId: null as string | null,
+            description: '',
+            quantity: 1,
+            unitPriceHt: 0,
+            vatRate: 20,
+            discountPercent: 0,
+          },
+        ];
     for (const line of source) {
       this.lines.push(
-        this.fb.nonNullable.group({
-          productId: [line.productId ?? ''],
-          description: [line.description, Validators.required],
-          quantity: [line.quantity, [Validators.required, Validators.min(0.0001)]],
-          unitPriceHt: [line.unitPriceHt, [Validators.required, Validators.min(0)]],
-          vatRate: [line.vatRate, [Validators.required, Validators.min(0)]],
+        this.lineGroup({
+          productId: line.productId ?? '',
+          description: line.description,
+          quantity: line.quantity,
+          unitPriceHt: line.unitPriceHt,
+          vatRate: line.vatRate,
+          discountPercent: Number(line.discountPercent ?? 0),
         }),
       );
     }
@@ -965,17 +1110,37 @@ export class QuotationsEditorPageComponent implements OnInit {
           quantity: Number(l.quantity),
           unitPriceHt: Number(l.unitPriceHt),
           vatRate: Number(l.vatRate),
+          discountPercent: this.clampPercent(l.discountPercent),
         })),
     };
   }
 
   private newLineGroup() {
+    return this.lineGroup({
+      productId: '',
+      description: '',
+      quantity: 1,
+      unitPriceHt: 0,
+      vatRate: 20,
+      discountPercent: 0,
+    });
+  }
+
+  private lineGroup(v: {
+    productId: string | null;
+    description: string;
+    quantity: number;
+    unitPriceHt: number;
+    vatRate: number;
+    discountPercent: number;
+  }) {
     return this.fb.nonNullable.group({
-      productId: [''],
-      description: ['', Validators.required],
-      quantity: [1, [Validators.required, Validators.min(0.0001)]],
-      unitPriceHt: [0, [Validators.required, Validators.min(0)]],
-      vatRate: [20, [Validators.required, Validators.min(0)]],
+      productId: [v.productId ?? ''],
+      description: [v.description, Validators.required],
+      quantity: [v.quantity, [Validators.required, Validators.min(0.0001)]],
+      unitPriceHt: [v.unitPriceHt, [Validators.required, Validators.min(0)]],
+      vatRate: [v.vatRate, [Validators.required, Validators.min(0)]],
+      discountPercent: [v.discountPercent, [Validators.min(0), Validators.max(100)]],
     });
   }
 

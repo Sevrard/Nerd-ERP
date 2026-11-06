@@ -1,3 +1,5 @@
+import type { VatBreakdownLine } from '../../shared/utils/money.util';
+
 export interface QuotationPreviewLine {
   sku: string | null;
   label: string;
@@ -6,6 +8,9 @@ export interface QuotationPreviewLine {
   unit: string;
   unitPriceHt: number;
   vatRate: number;
+  /** Remise de ligne en % (0 = aucune). */
+  discountPercent: number;
+  /** HT net de remise ligne. */
   lineTotalHt: number;
 }
 
@@ -22,6 +27,8 @@ export interface QuotationPreviewTotals {
   htNum: number;
   vatNum: number;
   ttcNum: number;
+  /** Ventilation TVA par taux (vide = une seule ligne « TVA »). */
+  vatLines: VatBreakdownLine[];
 }
 
 export const EMPTY_PREVIEW_TOTALS: QuotationPreviewTotals = {
@@ -35,4 +42,5 @@ export const EMPTY_PREVIEW_TOTALS: QuotationPreviewTotals = {
   htNum: 0,
   vatNum: 0,
   ttcNum: 0,
+  vatLines: [],
 };

@@ -15,6 +15,8 @@ import java.util.UUID;
 
 public interface QuotationRepository extends JpaRepository<Quotation, UUID> {
 
+    boolean existsByTenantIdAndWorkspaceId(UUID tenantId, UUID workspaceId);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT q FROM Quotation q WHERE q.id = :id AND q.tenantId = :tenantId")
     Optional<Quotation> findByIdAndTenantIdForUpdate(@Param("id") UUID id, @Param("tenantId") UUID tenantId);
@@ -28,5 +30,8 @@ public interface QuotationRepository extends JpaRepository<Quotation, UUID> {
     boolean existsByConvertedInvoiceIdAndTenantId(UUID convertedInvoiceId, UUID tenantId);
 
     boolean existsByTenantIdAndCustomerId(UUID tenantId, UUID customerId);
+
+    /** Lien public d'acceptation (recherche hors contexte de sécurité : l'empreinte vaut autorisation). */
+    Optional<Quotation> findByPublicTokenHash(String publicTokenHash);
 }
 

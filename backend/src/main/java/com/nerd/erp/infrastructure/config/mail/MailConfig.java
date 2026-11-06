@@ -3,13 +3,18 @@ package com.nerd.erp.infrastructure.config.mail;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.annotation.EnableAsync;
+import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 import java.util.concurrent.Executor;
 
-/** Exécuteur dédié aux envois d'e-mails (petit pool, file bornée : un SMTP lent ne bloque pas l'API). */
+/**
+ * Exécuteur dédié aux envois d'e-mails (petit pool, file bornée : un SMTP lent ne bloque pas l'API)
+ * et activation des tâches planifiées (relances automatiques).
+ */
 @Configuration
 @EnableAsync
+@EnableScheduling
 public class MailConfig {
 
     @Bean(name = "mailExecutor")
