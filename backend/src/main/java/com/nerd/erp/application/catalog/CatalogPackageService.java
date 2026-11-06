@@ -169,7 +169,7 @@ public class CatalogPackageService {
                     product.getReferenceCode(),
                     product.getName(),
                     product.getUnitPriceHt(),
-                    ProductCatalogText.unitLabelFromDescription(product.getDescription()),
+                    product.effectiveUnitLabel(),
                     item.getQuantity(),
                     lineTotal));
         }

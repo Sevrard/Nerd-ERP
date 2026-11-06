@@ -109,7 +109,7 @@
       <app-lucide-icon name="package" [size]="16" />
       Produits & prestations
       <span class="ml-1.5 rounded-full bg-slate-800 px-2 py-0.5 text-xs text-slate-300">{{
-        filteredProducts().length
+        page.meta().totalElements
       }}</span>
     </button>
     <button
@@ -198,9 +198,9 @@
         </label>
       </div>
 
-      @if (loading()) {
+      @if (loading() && !items().length) {
         <app-loading-state />
-      } @else if (!filteredProducts().length) {
+      } @else if (!items().length) {
         <app-empty-state title="Aucune prestation trouvée." />
       } @else {
         <div class="overflow-hidden rounded-xl border border-slate-800/80 bg-slate-900/60 shadow-xl">
@@ -256,10 +256,9 @@
                 </tr>
               </thead>
               <tbody class="divide-y divide-slate-800/60 text-sm">
-                @for (p of sortedFilteredProducts(); track p.id) {
+                @for (p of items(); track p.id) {
                   @let cat = categoryById(p.categoryId);
                   @let color = categoryColor(cat);
-                  @let bill = billing(p);
                   @let editing = editingProductId() === p.id;
                   @let draft = productEditDraft();
                   <tr class="group transition hover:bg-slate-800/40" [class.bg-cyan-950/20]="editing">
@@ -304,17 +303,27 @@
                     </td>
                     <td class="px-4 py-3.5">
                       @if (editing && draft) {
-                        <select
-                          [value]="draft.billingType"
-                          (change)="patchProductDraft({ billingType: $any($event.target).value })"
-                          class="w-full min-w-[140px] rounded border border-cyan-500/50 bg-slate-950 px-2 py-1 text-xs text-white"
-                        >
-                          <option value="DAYS">TJM / jour</option>
-                          <option value="FIXED_PRICE">Forfait fixe</option>
-                          <option value="RECURRING">Récurrent</option>
-                        </select>
+                        <div class="flex min-w-[200px] items-center gap-1">
+                          <select
+                            [value]="draft.billingType"
+                            (change)="patchDraftBillingType($any($event.target).value)"
+                            class="flex-1 rounded border border-cyan-500/50 bg-slate-950 px-2 py-1 text-xs text-white"
+                          >
+                            @for (opt of billingOptions; track opt.value) {
+                              <option [value]="opt.value">{{ opt.label }}</option>
+                            }
+                          </select>
+                          <input
+                            [value]="draft.unitLabel"
+                            (input)="patchProductDraft({ unitLabel: $any($event.target).value })"
+                            [placeholder]="draftUnitPlaceholder(draft.billingType)"
+                            maxlength="32"
+                            title="Unité affichée après le prix"
+                            class="w-20 rounded border border-cyan-500/50 bg-slate-950 px-2 py-1 text-xs text-white placeholder-slate-500"
+                          />
+                        </div>
                       } @else {
-                        @switch (bill.type) {
+                        @switch (p.billingType) {
                           @case ('DAYS') {
                             <span
                               class="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-0.5 text-xs font-semibold text-emerald-400"
@@ -340,7 +349,12 @@
                             </span>
                           }
                           @default {
-                            <span class="text-xs text-slate-500">—</span>
+                            <span
+                              class="inline-flex items-center gap-1.5 rounded-full border border-slate-600/40 bg-slate-800/60 px-2.5 py-0.5 text-xs font-semibold text-slate-300"
+                            >
+                              <app-lucide-icon name="package" [size]="12" />
+                              À l'unité
+                            </span>
                           }
                         }
                       }
@@ -356,11 +370,11 @@
                         />
                       } @else {
                         <span class="font-bold">{{ priceFormatted(p.unitPriceHt) }} €</span>
-                        <span class="ml-1 text-xs font-normal text-slate-500">/ {{ bill.unitLabel }}</span>
+                        <span class="ml-1 text-xs font-normal text-slate-500">/ {{ p.unitLabel }}</span>
                       }
                       @if (editing && draft) {
                         <span class="mt-0.5 block text-[10px] text-slate-500">
-                          / {{ draftBillingUnitLabel(draft.billingType) }}
+                          / {{ draft.unitLabel.trim() || draftUnitPlaceholder(draft.billingType) }}
                         </span>
                       }
                     </td>
@@ -421,6 +435,12 @@
               </tbody>
             </table>
           </div>
+          <app-paginator
+            [meta]="page.meta()"
+            [disabled]="loading()"
+            (pageChange)="onPageChange($event)"
+            (pageSizeChange)="onPageSizeChange($event)"
+          />
         </div>
       }
     </div>
@@ -729,6 +749,187 @@
     </div>
   }
 </div>
+
+@if (showPackageModal()) {
+  @let totals = livePackageTotals();
+  <div
+    class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="package-modal-title"
+  >
+    <div class="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl">
+      <div class="flex items-center justify-between border-b border-slate-800 px-6 py-4">
+        <h3 id="package-modal-title" class="flex items-center gap-2 text-lg font-bold text-white">
+          <app-lucide-icon name="boxes" [size]="20" class="text-purple-400" />
+          {{ editingPackageId() ? 'Modifier le package' : 'Nouveau package' }}
+        </h3>
+        <button type="button" class="text-slate-400 transition hover:text-slate-200" aria-label="Fermer" (click)="closePackageModal()">
+          <app-lucide-icon name="x" [size]="20" />
+        </button>
+      </div>
+      <form class="min-h-0 flex-1 space-y-5 overflow-y-auto p-6" [formGroup]="packageForm" (ngSubmit)="savePackageModal()">
+        <div class="grid gap-4 sm:grid-cols-3">
+          <div>
+            <label class="mb-1 block text-xs font-medium text-slate-400" for="pkg-ref">Référence</label>
+            <input
+              id="pkg-ref"
+              formControlName="referenceCode"
+              class="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-sm text-white focus:border-purple-500 focus:outline-none"
+            />
+          </div>
+          <div class="sm:col-span-2">
+            <label class="mb-1 block text-xs font-medium text-slate-400" for="pkg-title">Titre</label>
+            <input
+              id="pkg-title"
+              formControlName="title"
+              placeholder="Ex. Pack site vitrine"
+              class="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none"
+            />
+          </div>
+        </div>
+        <div>
+          <label class="mb-1 block text-xs font-medium text-slate-400" for="pkg-desc">Description (optionnelle)</label>
+          <textarea
+            id="pkg-desc"
+            formControlName="description"
+            rows="2"
+            class="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-white focus:border-purple-500 focus:outline-none"
+          ></textarea>
+        </div>
+
+        <div>
+          <div class="mb-2 flex items-center justify-between">
+            <label class="text-xs font-medium text-slate-400">Composition</label>
+            <span class="text-xs text-slate-500">{{ packageFormItems().length }} prestation(s)</span>
+          </div>
+          <app-search-select
+            [search]="productPicker.search"
+            [labelFn]="productPicker.label"
+            [detailFn]="productPicker.detail"
+            [clearOnSelect]="true"
+            [refreshKey]="workspaces.generation()"
+            placeholder="Ajouter une prestation au package…"
+            (itemSelected)="onPackageProductPicked($event)"
+          />
+          @if (packageFormItems().length) {
+            <ul class="mt-3 divide-y divide-slate-800 rounded-lg border border-slate-800">
+              @for (item of packageFormItems(); track item.productId) {
+                @let product = packageProduct(item.productId);
+                <li class="flex items-center gap-3 px-3 py-2 text-sm">
+                  <div class="min-w-0 flex-1">
+                    <div class="truncate font-medium text-slate-200">{{ product?.name ?? 'Prestation' }}</div>
+                    @if (product) {
+                      <div class="text-xs text-slate-500">
+                        {{ product.referenceCode }} · {{ priceFormatted(product.unitPriceHt) }} € / {{ product.unitLabel }}
+                      </div>
+                    }
+                  </div>
+                  <label class="flex items-center gap-1 text-xs text-slate-400">
+                    Qté
+                    <input
+                      type="number"
+                      min="0.0001"
+                      step="0.5"
+                      [value]="item.quantity"
+                      (input)="updatePackageItemQty(item.productId, +$any($event.target).value)"
+                      class="w-20 rounded border border-slate-700 bg-slate-950 px-2 py-1 text-right text-white"
+                    />
+                  </label>
+                  <span class="w-24 text-right font-mono text-slate-300">
+                    {{ priceFormatted(packageLineTotal(item.productId, item.quantity)) }} €
+                  </span>
+                  <app-icon-action icon="x" label="Retirer" variant="danger" (action)="removeProductFromPackageForm(item.productId)" />
+                </li>
+              }
+            </ul>
+          } @else {
+            <p class="mt-3 rounded-lg border border-dashed border-slate-800 px-3 py-4 text-center text-xs text-slate-500">
+              Ajoutez au moins une prestation.
+            </p>
+          }
+        </div>
+
+        <div class="grid gap-4 sm:grid-cols-3">
+          <div>
+            <label class="mb-1 block text-xs font-medium text-slate-400">Type de remise</label>
+            <div class="flex rounded-lg border border-slate-800 bg-slate-950 p-1 text-xs font-semibold">
+              <button
+                type="button"
+                class="flex-1 rounded-md px-3 py-1.5 transition"
+                [class.bg-purple-500]="packageForm.controls.discountType.value === 'PERCENT'"
+                [class.text-white]="packageForm.controls.discountType.value === 'PERCENT'"
+                [class.text-slate-400]="packageForm.controls.discountType.value !== 'PERCENT'"
+                (click)="setPackageDiscountType('PERCENT')"
+              >
+                %
+              </button>
+              <button
+                type="button"
+                class="flex-1 rounded-md px-3 py-1.5 transition"
+                [class.bg-purple-500]="packageForm.controls.discountType.value === 'FIXED'"
+                [class.text-white]="packageForm.controls.discountType.value === 'FIXED'"
+                [class.text-slate-400]="packageForm.controls.discountType.value !== 'FIXED'"
+                (click)="setPackageDiscountType('FIXED')"
+              >
+                € HT
+              </button>
+            </div>
+          </div>
+          <div>
+            <label class="mb-1 block text-xs font-medium text-slate-400" for="pkg-discount">Remise</label>
+            <input
+              id="pkg-discount"
+              type="number"
+              min="0"
+              step="0.01"
+              formControlName="discountValue"
+              class="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-white focus:border-purple-500 focus:outline-none"
+            />
+          </div>
+          <div>
+            <label class="mb-1 block text-xs font-medium text-slate-400" for="pkg-theme">Couleur du badge</label>
+            <select
+              id="pkg-theme"
+              formControlName="badgeTheme"
+              class="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-white focus:border-purple-500 focus:outline-none"
+            >
+              <option value="purple">Violet</option>
+              <option value="emerald">Émeraude</option>
+              <option value="cyan">Cyan</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-800 bg-slate-950/70 px-4 py-3 text-sm">
+          <div class="space-x-3 text-slate-400">
+            <span>Brut : <span class="font-mono text-slate-300">{{ priceFormatted(totals.grossTotal) }} €</span></span>
+            <span>Remise : <span class="font-mono text-emerald-400">−{{ priceFormatted(totals.discountAmount) }} €</span></span>
+          </div>
+          <div class="font-mono text-lg font-bold text-white">{{ priceFormatted(totals.netTotal) }} € HT</div>
+        </div>
+
+        <label class="flex items-center gap-2 text-sm text-slate-300">
+          <input type="checkbox" formControlName="active" class="h-4 w-4 rounded border-slate-700 bg-slate-950 text-purple-500" />
+          Package actif (proposé dans les devis)
+        </label>
+
+        <div class="flex items-center justify-end gap-3 border-t border-slate-800 pt-4">
+          <button type="button" class="px-4 py-2 text-sm text-slate-400 hover:text-white" (click)="closePackageModal()">
+            Annuler
+          </button>
+          <button
+            type="submit"
+            class="rounded-lg bg-purple-500 px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-purple-500/20 hover:bg-purple-400 disabled:opacity-50"
+            [disabled]="packageForm.invalid || !packageFormItems().length || saving()"
+          >
+            {{ saving() ? 'Enregistrement…' : 'Sauvegarder' }}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+}
 
 @if (showCategoryModal()) {
   <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm">

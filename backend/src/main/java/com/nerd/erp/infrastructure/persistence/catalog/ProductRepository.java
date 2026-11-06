@@ -7,6 +7,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.math.BigDecimal;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -22,8 +24,30 @@ public interface ProductRepository extends JpaRepository<Product, UUID> {
 
     boolean existsByTenantIdAndCategoryId(UUID tenantId, UUID categoryId);
 
-    Optional<Product> findByTenantIdAndWorkspaceIdAndEtsyListingId(
-            UUID tenantId, UUID workspaceId, Long etsyListingId);
+    long countByTenantIdAndWorkspaceIdAndActiveTrue(UUID tenantId, UUID workspaceId);
+
+    /** Nombre de produits (actifs ou non) par catégorie : [categoryId, count]. */
+    @Query("""
+            SELECT p.categoryId, COUNT(p) FROM Product p
+            WHERE p.tenantId = :tenantId AND p.workspaceId = :workspaceId AND p.categoryId IS NOT NULL
+            GROUP BY p.categoryId
+            """)
+    List<Object[]> countByCategory(@Param("tenantId") UUID tenantId, @Param("workspaceId") UUID workspaceId);
+
+    /** Somme des prix HT des produits actifs (valeur catalogue). */
+    @Query("""
+            SELECT COALESCE(SUM(p.unitPriceHt), 0) FROM Product p
+            WHERE p.tenantId = :tenantId AND p.workspaceId = :workspaceId AND p.active = true
+            """)
+    BigDecimal sumActiveUnitPriceHt(@Param("tenantId") UUID tenantId, @Param("workspaceId") UUID workspaceId);
+
+    /** TJM moyen des produits actifs facturés à la journée. */
+    @Query("""
+            SELECT AVG(p.unitPriceHt) FROM Product p
+            WHERE p.tenantId = :tenantId AND p.workspaceId = :workspaceId AND p.active = true
+            AND p.billingType = com.nerd.erp.domain.catalog.BillingType.DAYS
+            """)
+    Double averageActiveDayRate(@Param("tenantId") UUID tenantId, @Param("workspaceId") UUID workspaceId);
 
     @Query("""
             SELECT p FROM Product p

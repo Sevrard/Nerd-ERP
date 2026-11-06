@@ -2,9 +2,10 @@ import { DatePipe } from '@angular/common';
 import { Component, effect, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { WorkspaceService } from '../../core/workspace/workspace.service';
+import { customerPickerSource } from '../customers/customer-picker.util';
 import { CustomersApiService } from '../customers/customers-api.service';
+import { productPickerSource } from '../products/product-picker.util';
 import { ProductsApiService } from '../products/products-api.service';
-import { Customer, customerDisplayName } from '../../shared/models/customer.model';
 import {
   MaintenanceContract,
   MaintenanceContractStatus,
@@ -12,16 +13,27 @@ import {
 } from '../../shared/models/maintenance.model';
 import { Product } from '../../shared/models/product.model';
 import { formatMoney } from '../../shared/utils/money.util';
+import { PageState } from '../../shared/utils/page-state';
 import { EmptyStateComponent } from '../../shared/ui/empty-state.component';
 import { ErrorBannerComponent } from '../../shared/ui/error-banner.component';
 import { LoadingStateComponent } from '../../shared/ui/loading-state.component';
+import { PaginatorComponent } from '../../shared/ui/paginator.component';
+import { SearchSelectComponent } from '../../shared/ui/search-select.component';
 import { MaintenanceApiService } from './maintenance-api.service';
 import { apiErrorMessage } from '../../shared/utils/api-error.util';
 
 @Component({
   selector: 'app-maintenance-page',
   standalone: true,
-  imports: [ReactiveFormsModule, DatePipe, LoadingStateComponent, EmptyStateComponent, ErrorBannerComponent],
+  imports: [
+    ReactiveFormsModule,
+    DatePipe,
+    LoadingStateComponent,
+    EmptyStateComponent,
+    ErrorBannerComponent,
+    PaginatorComponent,
+    SearchSelectComponent,
+  ],
   template: `
     <div class="space-y-8">
       <h1 class="text-2xl font-bold text-white">Maintenance</h1>
@@ -34,21 +46,28 @@ import { apiErrorMessage } from '../../shared/utils/api-error.util';
         <form class="grid gap-4 sm:grid-cols-2" [formGroup]="form" (ngSubmit)="create()">
           <div>
             <label class="mb-1 block text-xs text-slate-500">Client</label>
-            <select formControlName="customerId" class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white">
-              <option value="">— Choisir —</option>
-              @for (c of customers(); track c.id) {
-                <option [value]="c.id">{{ label(c) }}</option>
-              }
-            </select>
+            <app-search-select
+              formControlName="customerId"
+              [search]="customerPicker.search"
+              [resolve]="customerPicker.resolve"
+              [labelFn]="customerPicker.label"
+              [detailFn]="customerPicker.detail"
+              [refreshKey]="workspaces.generation()"
+              placeholder="Rechercher un client…"
+            />
           </div>
           <div>
             <label class="mb-1 block text-xs text-slate-500">Produit (optionnel)</label>
-            <select formControlName="productId" class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white">
-              <option value="">— Aucun —</option>
-              @for (p of products(); track p.id) {
-                <option [value]="p.id">{{ p.name }}</option>
-              }
-            </select>
+            <app-search-select
+              formControlName="productId"
+              [search]="productPicker.search"
+              [resolve]="productPicker.resolve"
+              [labelFn]="productPicker.label"
+              [detailFn]="productPicker.detail"
+              [refreshKey]="workspaces.generation()"
+              placeholder="Rechercher une prestation…"
+              (itemSelected)="onProductPicked($event)"
+            />
           </div>
           <div class="sm:col-span-2">
             <label class="mb-1 block text-xs text-slate-500">Titre</label>
@@ -103,7 +122,7 @@ import { apiErrorMessage } from '../../shared/utils/api-error.util';
         @if (listError()) {
           <app-error-banner [message]="listError()!" />
         }
-        @if (loading()) {
+        @if (loading() && !contracts().length) {
           <app-loading-state />
         } @else if (!contracts().length) {
           <app-empty-state title="Aucun contrat de maintenance." />
@@ -129,6 +148,12 @@ import { apiErrorMessage } from '../../shared/utils/api-error.util';
                 }
               </tbody>
             </table>
+            <app-paginator
+              [meta]="page.meta()"
+              [disabled]="loading()"
+              (pageChange)="onPageChange($event)"
+              (pageSizeChange)="onPageSizeChange($event)"
+            />
           </div>
         }
       </section>
@@ -139,7 +164,7 @@ export class MaintenancePageComponent {
   private readonly api = inject(MaintenanceApiService);
   private readonly customersApi = inject(CustomersApiService);
   private readonly productsApi = inject(ProductsApiService);
-  private readonly workspaces = inject(WorkspaceService);
+  readonly workspaces = inject(WorkspaceService);
   private readonly fb = inject(FormBuilder);
 
   readonly loading = signal(false);
@@ -147,8 +172,9 @@ export class MaintenancePageComponent {
   readonly listError = signal<string | null>(null);
   readonly formError = signal<string | null>(null);
   readonly contracts = signal<MaintenanceContract[]>([]);
-  readonly customers = signal<Customer[]>([]);
-  readonly products = signal<Product[]>([]);
+  readonly page = new PageState();
+  readonly customerPicker = customerPickerSource(this.customersApi, this.workspaces);
+  readonly productPicker = productPickerSource(this.productsApi, this.workspaces);
 
   readonly form = this.fb.nonNullable.group({
     customerId: ['', Validators.required],
@@ -171,18 +197,36 @@ export class MaintenancePageComponent {
       if (!workspaceId) {
         return;
       }
-      this.customersApi.search(workspaceId, {}).subscribe((page) => this.customers.set(page.content));
-      this.productsApi.search(workspaceId, {}).subscribe((page) => this.products.set(page.content));
+      this.page.reset();
       this.reload();
     });
   }
 
-  label(c: Customer): string {
-    return customerDisplayName(c);
+  /** Pré-remplit titre / montant / TVA depuis la prestation choisie si le formulaire est vierge. */
+  onProductPicked(product: Product | null): void {
+    if (!product) {
+      return;
+    }
+    if (!this.form.controls.title.value.trim()) {
+      this.form.controls.title.setValue(product.name);
+    }
+    if (!Number(this.form.controls.amountHt.value)) {
+      this.form.patchValue({ amountHt: product.unitPriceHt, vatRate: product.vatRate });
+    }
   }
 
   money(v: number): string {
     return formatMoney(v);
+  }
+
+  onPageChange(index: number): void {
+    this.page.goTo(index);
+    this.reload();
+  }
+
+  onPageSizeChange(size: number): void {
+    this.page.setSize(size);
+    this.reload();
   }
 
   create(): void {
@@ -239,12 +283,13 @@ export class MaintenancePageComponent {
     }
     const gen = this.workspaces.generation();
     this.loading.set(true);
-    this.api.list(workspaceId).subscribe({
+    this.api.list(workspaceId, this.page.query()).subscribe({
       next: (page) => {
         if (this.workspaces.isStale(gen)) {
           return;
         }
         this.contracts.set(page.content);
+        this.page.apply(page);
         this.loading.set(false);
       },
       error: (err) => {

@@ -30,16 +30,18 @@ function parseArgs() {
   return { workspaceSlug, file };
 }
 
-function buildDescription(category, item) {
+const BILLING_TYPES = new Set(['UNIT', 'DAYS', 'FIXED_PRICE', 'RECURRING']);
+
+function buildDescription(item) {
   const lines = [
-    `Catégorie : ${category.label} (${category.code})`,
-    `Facturation : ${item.billing_type}${item.billing_cycle ? ` / ${item.billing_cycle}` : ''}`,
-    `Quantité indicative : ${item.default_quantity} ${item.unit_label}`,
     item.is_optional_default ? 'Optionnel par défaut dans les devis.' : '',
-    '',
     item.description ?? '',
   ];
   return lines.filter(Boolean).join('\n');
+}
+
+function billingType(item) {
+  return BILLING_TYPES.has(item.billing_type) ? item.billing_type : 'UNIT';
 }
 
 async function api(method, path, token, body) {
@@ -120,11 +122,13 @@ async function main() {
         workspaceId: ws.id,
         referenceCode: item.sku,
         name: item.label,
-        description: buildDescription(category, item),
+        description: buildDescription(item),
         unitPriceHt: item.unit_price_ht,
         vatRate,
         active: true,
         categoryId: cat?.id ?? null,
+        billingType: billingType(item),
+        unitLabel: item.unit_label ?? null,
       };
       const prev = byRef.get(item.sku.toUpperCase());
       if (prev) {

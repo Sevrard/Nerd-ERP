@@ -1,23 +1,36 @@
 import { DatePipe } from '@angular/common';
-import { Component, effect, inject, signal } from '@angular/core';
+import { Component, computed, effect, inject, signal } from '@angular/core';
+import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { FormArray, FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { Observable, map, of } from 'rxjs';
 import { WorkspaceService } from '../../core/workspace/workspace.service';
+import { customerPickerSource } from '../customers/customer-picker.util';
 import { CustomersApiService } from '../customers/customers-api.service';
 import { InvoicesApiService } from '../invoices/invoices-api.service';
-import { Customer, customerDisplayName } from '../../shared/models/customer.model';
 import { Invoice } from '../../shared/models/invoice.model';
 import { Payment, PaymentMethod, PaymentPayload } from '../../shared/models/payment.model';
 import { formatMoney } from '../../shared/utils/money.util';
+import { PageState } from '../../shared/utils/page-state';
 import { EmptyStateComponent } from '../../shared/ui/empty-state.component';
 import { ErrorBannerComponent } from '../../shared/ui/error-banner.component';
 import { LoadingStateComponent } from '../../shared/ui/loading-state.component';
+import { PaginatorComponent } from '../../shared/ui/paginator.component';
+import { SEARCH_SELECT_LIMIT, SearchSelectComponent } from '../../shared/ui/search-select.component';
 import { PaymentsApiService } from './payments-api.service';
 import { apiErrorMessage } from '../../shared/utils/api-error.util';
 
 @Component({
   selector: 'app-payments-page',
   standalone: true,
-  imports: [ReactiveFormsModule, DatePipe, LoadingStateComponent, EmptyStateComponent, ErrorBannerComponent],
+  imports: [
+    ReactiveFormsModule,
+    DatePipe,
+    LoadingStateComponent,
+    EmptyStateComponent,
+    ErrorBannerComponent,
+    PaginatorComponent,
+    SearchSelectComponent,
+  ],
   template: `
     <div class="space-y-8">
       <h1 class="text-2xl font-bold text-white">Paiements</h1>
@@ -31,12 +44,15 @@ import { apiErrorMessage } from '../../shared/utils/api-error.util';
           <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <div>
               <label class="mb-1 block text-xs text-slate-500">Client</label>
-              <select formControlName="customerId" class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white">
-                <option value="">— Choisir —</option>
-                @for (c of customers(); track c.id) {
-                  <option [value]="c.id">{{ label(c) }}</option>
-                }
-              </select>
+              <app-search-select
+                formControlName="customerId"
+                [search]="customerPicker.search"
+                [resolve]="customerPicker.resolve"
+                [labelFn]="customerPicker.label"
+                [detailFn]="customerPicker.detail"
+                [refreshKey]="workspaces.generation()"
+                placeholder="Rechercher un client…"
+              />
             </div>
             <div>
               <label class="mb-1 block text-xs text-slate-500">Montant</label>
@@ -76,12 +92,18 @@ import { apiErrorMessage } from '../../shared/utils/api-error.util';
             <div class="space-y-2" formArrayName="allocations">
               @for (row of allocations.controls; track $index; let i = $index) {
                 <div class="grid gap-2 sm:grid-cols-3" [formGroupName]="i">
-                  <select formControlName="invoiceId" class="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white sm:col-span-2">
-                    <option value="">Facture</option>
-                    @for (inv of openInvoices(); track inv.id) {
-                      <option [value]="inv.id">{{ inv.number }} · {{ money(inv.totalTtc - inv.amountPaid) }} restant</option>
-                    }
-                  </select>
+                  <app-search-select
+                    class="sm:col-span-2"
+                    formControlName="invoiceId"
+                    [search]="searchOpenInvoices"
+                    [resolve]="resolveInvoice"
+                    [labelFn]="invoiceLabel"
+                    [detailFn]="invoiceDetail"
+                    [refreshKey]="customerKey()"
+                    [placeholder]="form.controls.customerId.value ? 'Facture ouverte du client…' : 'Choisissez d’abord un client'"
+                    emptyLabel="Aucune facture ouverte"
+                    (itemSelected)="onInvoicePicked(i, $event)"
+                  />
                   <input type="number" step="0.01" formControlName="amount" placeholder="Montant" class="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white" />
                 </div>
               }
@@ -99,7 +121,7 @@ import { apiErrorMessage } from '../../shared/utils/api-error.util';
         @if (listError()) {
           <app-error-banner [message]="listError()!" />
         }
-        @if (loading()) {
+        @if (loading() && !payments().length) {
           <app-loading-state />
         } @else if (!payments().length) {
           <app-empty-state title="Aucun paiement." />
@@ -125,6 +147,12 @@ import { apiErrorMessage } from '../../shared/utils/api-error.util';
                 }
               </tbody>
             </table>
+            <app-paginator
+              [meta]="page.meta()"
+              [disabled]="loading()"
+              (pageChange)="onPageChange($event)"
+              (pageSizeChange)="onPageSizeChange($event)"
+            />
           </div>
         }
       </section>
@@ -135,7 +163,7 @@ export class PaymentsPageComponent {
   private readonly api = inject(PaymentsApiService);
   private readonly customersApi = inject(CustomersApiService);
   private readonly invoicesApi = inject(InvoicesApiService);
-  private readonly workspaces = inject(WorkspaceService);
+  readonly workspaces = inject(WorkspaceService);
   private readonly fb = inject(FormBuilder);
 
   readonly loading = signal(false);
@@ -143,10 +171,29 @@ export class PaymentsPageComponent {
   readonly listError = signal<string | null>(null);
   readonly formError = signal<string | null>(null);
   readonly payments = signal<Payment[]>([]);
-  readonly customers = signal<Customer[]>([]);
-  readonly invoices = signal<Invoice[]>([]);
+  readonly page = new PageState();
 
-  readonly openInvoices = signal<Invoice[]>([]);
+  readonly customerPicker = customerPickerSource(this.customersApi, this.workspaces);
+
+  /** Factures ouvertes (reste à payer > 0) du client sélectionné. */
+  readonly searchOpenInvoices = (q: string): Observable<Invoice[]> => {
+    const customerId = this.form.controls.customerId.value;
+    if (!customerId) {
+      return of([]);
+    }
+    return this.invoicesApi
+      .list(this.workspaces.requireSelectedId(), {
+        customerId,
+        openOnly: true,
+        q: q || undefined,
+        size: SEARCH_SELECT_LIMIT,
+        sort: 'issueDate,desc',
+      })
+      .pipe(map((page) => page.content));
+  };
+  readonly resolveInvoice = (id: string): Observable<Invoice> => this.invoicesApi.get(id);
+  readonly invoiceLabel = (inv: Invoice): string => inv.number ?? 'Brouillon';
+  readonly invoiceDetail = (inv: Invoice): string => `${formatMoney(inv.totalTtc - inv.amountPaid)} restant`;
 
   readonly form = this.fb.nonNullable.group({
     customerId: ['', Validators.required],
@@ -158,33 +205,29 @@ export class PaymentsPageComponent {
     allocations: this.fb.array([this.allocationGroup()]),
   });
 
+  /** Clé de rafraîchissement des sélecteurs de factures : client courant + workspace. */
+  private readonly customerIdSignal = toSignal(this.form.controls.customerId.valueChanges, { initialValue: '' });
+  readonly customerKey = computed(() => `${this.workspaces.generation()}:${this.customerIdSignal()}`);
+
   get allocations(): FormArray {
     return this.form.controls.allocations;
   }
 
   constructor() {
     effect(() => {
-      const gen = this.workspaces.generation();
-      const workspaceId = this.workspaces.selectedId();
-      if (!workspaceId) {
+      this.workspaces.generation();
+      if (!this.workspaces.selectedId()) {
         return;
       }
-      this.customersApi.search(workspaceId, {}).subscribe((page) => this.customers.set(page.content));
-      this.invoicesApi.list(workspaceId).subscribe((page) => {
-        if (this.workspaces.isStale(gen)) {
-          return;
-        }
-        this.invoices.set(page.content);
-        this.refreshOpenInvoices();
-      });
+      this.page.reset();
       this.reloadList();
     });
 
-    this.form.controls.customerId.valueChanges.subscribe(() => this.refreshOpenInvoices());
-  }
-
-  label(c: Customer): string {
-    return customerDisplayName(c);
+    // Changement de client : les affectations précédentes ne sont plus valides.
+    this.form.controls.customerId.valueChanges.pipe(takeUntilDestroyed()).subscribe(() => {
+      this.allocations.clear();
+      this.allocations.push(this.allocationGroup());
+    });
   }
 
   money(v: number): string {
@@ -193,6 +236,31 @@ export class PaymentsPageComponent {
 
   addAllocation(): void {
     this.allocations.push(this.allocationGroup());
+  }
+
+  /** Pré-remplit le montant avec le reste à payer de la facture choisie. */
+  onInvoicePicked(index: number, invoice: Invoice | null): void {
+    if (!invoice) {
+      return;
+    }
+    const ctrl = this.allocations.at(index);
+    const remaining = Math.round((invoice.totalTtc - invoice.amountPaid) * 100) / 100;
+    if (!Number(ctrl.get('amount')?.value)) {
+      ctrl.patchValue({ amount: remaining });
+    }
+    if (!Number(this.form.controls.amount.value)) {
+      this.form.controls.amount.setValue(remaining);
+    }
+  }
+
+  onPageChange(index: number): void {
+    this.page.goTo(index);
+    this.reloadList();
+  }
+
+  onPageSizeChange(size: number): void {
+    this.page.setSize(size);
+    this.reloadList();
   }
 
   submit(): void {
@@ -244,12 +312,13 @@ export class PaymentsPageComponent {
     }
     const gen = this.workspaces.generation();
     this.loading.set(true);
-    this.api.list(workspaceId).subscribe({
+    this.api.list(workspaceId, this.page.query()).subscribe({
       next: (page) => {
         if (this.workspaces.isStale(gen)) {
           return;
         }
         this.payments.set(page.content);
+        this.page.apply(page);
         this.loading.set(false);
       },
       error: (err) => {
@@ -260,14 +329,6 @@ export class PaymentsPageComponent {
         this.loading.set(false);
       },
     });
-  }
-
-  private refreshOpenInvoices(): void {
-    const customerId = this.form.controls.customerId.value;
-    const open = this.invoices().filter(
-      (i) => i.customerId === customerId && i.totalTtc - i.amountPaid > 0.0001,
-    );
-    this.openInvoices.set(open);
   }
 
   private allocationGroup() {

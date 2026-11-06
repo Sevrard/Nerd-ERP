@@ -1,6 +1,5 @@
+import { BillingType, Product } from '../../shared/models/product.model';
 import { ProductCategory } from '../../shared/models/product-category.model';
-
-export type BillingType = 'DAYS' | 'FIXED_PRICE' | 'RECURRING' | 'UNKNOWN';
 
 export interface CategoryColorTheme {
   name: string;
@@ -63,101 +62,51 @@ export function resolveCategoryColor(
   return categoryColorByIndex(category.sortOrder);
 }
 
-export type EditableBillingType = 'DAYS' | 'FIXED_PRICE' | 'RECURRING';
-
-export function parseIndicativeQuantity(description: string | null): { quantity: number; unitLabel: string } {
-  const qtyMatch = description?.match(/Quantité indicative :\s*([\d.,]+)\s*(\S+)/);
-  const quantity = qtyMatch ? parseFloat(qtyMatch[1].replace(',', '.')) || 1 : 1;
-  const unitLabel = qtyMatch?.[2] ?? 'unité';
-  return { quantity, unitLabel };
+export interface BillingTypeOption {
+  value: BillingType;
+  label: string;
+  defaultUnitLabel: string;
 }
 
-/** Met à jour les lignes Facturation / Quantité indicative en conservant le corps texte. */
-export function applyBillingTypeToDescription(
-  description: string | null,
-  billingType: EditableBillingType,
-): string {
-  const { quantity } = parseIndicativeQuantity(description);
-  const unitLabel =
-    billingType === 'DAYS' ? 'jours' : billingType === 'FIXED_PRICE' ? 'forfait' : 'mois';
-  const factLine = `Facturation : ${billingType}`;
-  const qtyLine = `Quantité indicative : ${quantity} ${unitLabel}`;
+/** Modes de tarification proposés dans les formulaires (ordre d'affichage). */
+export const BILLING_TYPE_OPTIONS: readonly BillingTypeOption[] = [
+  { value: 'UNIT', label: "À l'unité", defaultUnitLabel: 'unité' },
+  { value: 'DAYS', label: 'TJM / jour', defaultUnitLabel: 'jour' },
+  { value: 'FIXED_PRICE', label: 'Forfait fixe', defaultUnitLabel: 'forfait' },
+  { value: 'RECURRING', label: 'Récurrent', defaultUnitLabel: 'mois' },
+];
 
-  if (!description?.trim()) {
-    return [factLine, qtyLine].join('\n');
-  }
-
-  const lines = description.split('\n');
-  let hasFact = false;
-  let hasQty = false;
-  const updated = lines.map((line) => {
-    if (line.startsWith('Facturation :')) {
-      hasFact = true;
-      return factLine;
-    }
-    if (line.startsWith('Quantité indicative :')) {
-      hasQty = true;
-      return qtyLine;
-    }
-    return line;
-  });
-
-  if (!hasFact || !hasQty) {
-    const insertAt = updated.findIndex((l) => l.trim() === '');
-    const prefix = [factLine, qtyLine];
-    if (insertAt >= 0) {
-      updated.splice(insertAt, 0, ...prefix);
-    } else {
-      updated.unshift(...prefix, '');
-    }
-  }
-
-  return updated.join('\n');
+export function billingTypeLabel(type: BillingType): string {
+  return BILLING_TYPE_OPTIONS.find((o) => o.value === type)?.label ?? type;
 }
 
-export function editableBillingFromDescription(description: string | null): EditableBillingType {
-  const { type } = parseBillingFromDescription(description);
-  if (type === 'DAYS' || type === 'FIXED_PRICE' || type === 'RECURRING') {
-    return type;
-  }
-  return 'FIXED_PRICE';
+export function defaultUnitLabel(type: BillingType): string {
+  return BILLING_TYPE_OPTIONS.find((o) => o.value === type)?.defaultUnitLabel ?? 'unité';
 }
 
-export function parseBillingFromDescription(description: string | null): { type: BillingType; unitLabel: string } {
-  if (!description) {
-    return { type: 'UNKNOWN', unitLabel: 'unité' };
+/** Libellé « mode / unité » affiché dans les sélecteurs de produits (devis, packages). */
+export function billingSummary(product: Pick<Product, 'billingType' | 'unitLabel'>): string {
+  switch (product.billingType) {
+    case 'DAYS':
+      return `TJM / ${product.unitLabel}`;
+    case 'RECURRING':
+      return `Récurrent / ${product.unitLabel}`;
+    case 'FIXED_PRICE':
+      return 'Forfait';
+    default:
+      return product.unitLabel;
   }
-  const billMatch = description.match(/Facturation :\s*(\w+)/);
-  const qtyMatch = description.match(/Quantité indicative :\s*[\d.,]+\s*(\S+)/);
-  const raw = billMatch?.[1] ?? '';
-  const type: BillingType =
-    raw === 'DAYS' || raw === 'FIXED_PRICE' || raw === 'RECURRING' ? raw : 'UNKNOWN';
-  let unitLabel = qtyMatch?.[1] ?? 'unité';
-  if (type === 'FIXED_PRICE') {
-    unitLabel = 'forfait';
-  }
-  if (type === 'RECURRING') {
-    unitLabel = qtyMatch?.[1] ?? 'mois';
-  }
-  return { type, unitLabel };
 }
 
 export function productShortDescription(description: string | null): string {
   if (!description?.trim()) {
     return '';
   }
-  const lines = description
+  return description
     .split('\n')
     .map((l) => l.trim())
-    .filter(Boolean);
-  const body = lines.filter(
-    (l) =>
-      !l.startsWith('Catégorie :') &&
-      !l.startsWith('Facturation :') &&
-      !l.startsWith('Quantité indicative :') &&
-      !l.startsWith('Optionnel par défaut'),
-  );
-  return body.join(' ');
+    .filter((l) => l && !l.startsWith('Optionnel par défaut'))
+    .join(' ');
 }
 
 export function formatPriceHt(value: number): string {

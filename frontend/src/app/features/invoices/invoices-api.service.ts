@@ -2,14 +2,17 @@ import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 import { ApiClient } from '../../core/api/api-client.service';
 import { Invoice } from '../../shared/models/invoice.model';
-import { PageResponse } from '../../shared/models/page.model';
+import { PageQuery, PageResponse } from '../../shared/models/page.model';
 
 @Injectable({ providedIn: 'root' })
 export class InvoicesApiService {
   private readonly api = inject(ApiClient);
 
-  list(workspaceId: string): Observable<PageResponse<Invoice>> {
-    return this.api.get<PageResponse<Invoice>>('/invoices', { workspaceId });
+  list(
+    workspaceId: string,
+    query: { customerId?: string; openOnly?: boolean; q?: string } & PageQuery = {},
+  ): Observable<PageResponse<Invoice>> {
+    return this.api.get<PageResponse<Invoice>>('/invoices', { workspaceId, ...query });
   }
 
   get(id: string): Observable<Invoice> {

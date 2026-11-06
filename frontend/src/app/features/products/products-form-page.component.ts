@@ -2,13 +2,14 @@ import { Component, inject, OnInit, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { WorkspaceService } from '../../core/workspace/workspace.service';
-import { ProductPayload } from '../../shared/models/product.model';
+import { BillingType, ProductPayload } from '../../shared/models/product.model';
 import { ErrorBannerComponent } from '../../shared/ui/error-banner.component';
 import { LoadingStateComponent } from '../../shared/ui/loading-state.component';
 import { ProductsApiService } from './products-api.service';
 import { ProductCategoriesApiService } from './product-categories-api.service';
 import { ProductCategory } from '../../shared/models/product-category.model';
 import { apiErrorMessage } from '../../shared/utils/api-error.util';
+import { BILLING_TYPE_OPTIONS, defaultUnitLabel } from './product-catalog.util';
 
 @Component({
   selector: 'app-products-form-page',
@@ -53,6 +54,25 @@ import { apiErrorMessage } from '../../shared/utils/api-error.util';
           </div>
           <div class="grid grid-cols-2 gap-4">
             <div>
+              <label class="mb-1 block text-xs text-slate-500">Mode de tarif</label>
+              <select formControlName="billingType" (change)="onBillingTypeChange()" class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white">
+                @for (opt of billingOptions; track opt.value) {
+                  <option [value]="opt.value">{{ opt.label }}</option>
+                }
+              </select>
+            </div>
+            <div>
+              <label class="mb-1 block text-xs text-slate-500">Unité (affichée après le prix)</label>
+              <input
+                formControlName="unitLabel"
+                maxlength="32"
+                [placeholder]="unitPlaceholder()"
+                class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white placeholder-slate-500"
+              />
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
               <label class="mb-1 block text-xs text-slate-500">Prix HT</label>
               <input type="number" step="0.01" formControlName="unitPriceHt" class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white" />
             </div>
@@ -86,16 +106,28 @@ export class ProductsFormPageComponent implements OnInit {
   readonly saving = signal(false);
   readonly error = signal<string | null>(null);
   readonly categories = signal<ProductCategory[]>([]);
+  readonly billingOptions = BILLING_TYPE_OPTIONS;
 
   readonly form = this.fb.group({
     referenceCode: ['', Validators.required],
     name: ['', Validators.required],
     description: [''],
     categoryId: [''],
+    billingType: ['UNIT' as BillingType, Validators.required],
+    unitLabel: [''],
     unitPriceHt: [0, [Validators.required, Validators.min(0)]],
     vatRate: [20, [Validators.required, Validators.min(0)]],
     active: [true],
   });
+
+  unitPlaceholder(): string {
+    return defaultUnitLabel(this.form.controls.billingType.value ?? 'UNIT');
+  }
+
+  /** Changement de mode : l'unité personnalisée repart du défaut du nouveau mode. */
+  onBillingTypeChange(): void {
+    this.form.controls.unitLabel.setValue('');
+  }
 
   ngOnInit(): void {
     const workspaceId = this.workspaces.selectedId();
@@ -115,6 +147,8 @@ export class ProductsFormPageComponent implements OnInit {
             name: p.name,
             description: p.description ?? '',
             categoryId: p.categoryId ?? '',
+            billingType: p.billingType,
+            unitLabel: p.unitLabel === defaultUnitLabel(p.billingType) ? '' : p.unitLabel,
             unitPriceHt: p.unitPriceHt,
             vatRate: p.vatRate,
             active: p.active,
@@ -143,6 +177,8 @@ export class ProductsFormPageComponent implements OnInit {
       unitPriceHt: raw.unitPriceHt!,
       vatRate: raw.vatRate!,
       active: raw.active ?? true,
+      billingType: raw.billingType ?? 'UNIT',
+      unitLabel: raw.unitLabel?.trim() || null,
     };
     this.saving.set(true);
     const req = this.editId ? this.api.update(this.editId, payload) : this.api.create(payload);

@@ -49,11 +49,12 @@ public class InvoiceService {
     }
 
     @Transactional(readOnly = true)
-    public PageResponse<InvoiceResponse> list(UUID workspaceId, Pageable pageable) {
+    public PageResponse<InvoiceResponse> list(UUID workspaceId, UUID customerId, boolean openOnly, String q,
+                                              Pageable pageable) {
         UUID tenantId = SecurityContextHelper.requireTenantId();
         workspaceService.requireInTenant(workspaceId, tenantId);
-        Page<Invoice> page = invoiceRepository.findByTenantIdAndWorkspaceIdOrderByIssueDateDesc(
-                tenantId, workspaceId, pageable);
+        String qPattern = q == null || q.isBlank() ? null : "%" + q.trim().toLowerCase() + "%";
+        Page<Invoice> page = invoiceRepository.search(tenantId, workspaceId, customerId, openOnly, qPattern, pageable);
         return PageResponse.from(page.map(invoiceMapper::toResponse));
     }
 

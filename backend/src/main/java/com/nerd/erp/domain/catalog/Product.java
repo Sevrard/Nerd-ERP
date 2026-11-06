@@ -3,6 +3,8 @@ package com.nerd.erp.domain.catalog;
 import com.nerd.erp.domain.shared.TenantScopedEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.Setter;
@@ -39,6 +41,18 @@ public class Product extends TenantScopedEntity {
     @Column(name = "category_id")
     private UUID categoryId;
 
-    @Column(name = "etsy_listing_id")
-    private Long etsyListingId;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "billing_type", nullable = false, length = 32)
+    private BillingType billingType = BillingType.UNIT;
+
+    /** Libellé d'unité affiché après le prix (« jour », « forfait », « mois », « pièce »…). Null = défaut du mode. */
+    @Column(name = "unit_label", length = 32)
+    private String unitLabel;
+
+    public String effectiveUnitLabel() {
+        if (unitLabel != null && !unitLabel.isBlank()) {
+            return unitLabel;
+        }
+        return (billingType == null ? BillingType.UNIT : billingType).defaultUnitLabel();
+    }
 }

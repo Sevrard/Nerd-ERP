@@ -1,13 +1,20 @@
-import { Component, computed, effect, inject, OnInit, signal } from '@angular/core';
+import { Component, computed, DestroyRef, effect, inject, OnInit, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
+import { catchError, debounceTime, distinctUntilChanged, forkJoin, of, Subject } from 'rxjs';
 import { WorkspaceService } from '../../core/workspace/workspace.service';
-import { Product } from '../../shared/models/product.model';
+import { sortParam } from '../../shared/models/page.model';
+import { BillingType, Product, ProductStats } from '../../shared/models/product.model';
 import { EmptyStateComponent } from '../../shared/ui/empty-state.component';
 import { ErrorBannerComponent } from '../../shared/ui/error-banner.component';
 import { LoadingStateComponent } from '../../shared/ui/loading-state.component';
 import { IconActionComponent } from '../../shared/ui/icon-action.component';
 import { LucideIconComponent } from '../../shared/ui/lucide-icon.component';
+import { PaginatorComponent } from '../../shared/ui/paginator.component';
+import { SearchSelectComponent } from '../../shared/ui/search-select.component';
+import { PageState } from '../../shared/utils/page-state';
+import { productPickerSource } from './product-picker.util';
 import { ProductsApiService } from './products-api.service';
 import { ProductCategoriesApiService } from './product-categories-api.service';
 import { CatalogPackagesApiService } from './catalog-packages-api.service';
@@ -21,16 +28,13 @@ import { apiErrorMessage } from '../../shared/utils/api-error.util';
 import { nextSortDirection, sortMultiplier, SortDirection } from '../../shared/utils/table-sort.util';
 import { SortableThComponent } from '../../shared/ui/sortable-th.component';
 import {
-  BillingType,
+  BILLING_TYPE_OPTIONS,
   CATEGORY_COLOR_PALETTE,
   CategoryColorTheme,
+  defaultUnitLabel,
   formatPriceHt,
   loadCategoryColorMap,
   packageBadgeClasses,
-  applyBillingTypeToDescription,
-  editableBillingFromDescription,
-  EditableBillingType,
-  parseBillingFromDescription,
   productShortDescription,
   resolveCategoryColor,
   saveCategoryColor,
@@ -40,12 +44,33 @@ type CatalogTab = 'products' | 'categories' | 'packages';
 
 type ProductSortKey = 'referenceCode' | 'name' | 'category' | 'price' | 'vat';
 
+/**
+ * Colonnes UI → propriétés JPA triables côté serveur.
+ * « Catégorie » trie par identifiant (regroupe les produits d'une même catégorie), pas par libellé.
+ */
+const PRODUCT_SORT_PROPERTIES: Record<ProductSortKey, string> = {
+  referenceCode: 'referenceCode',
+  name: 'name',
+  category: 'categoryId,name',
+  price: 'unitPriceHt',
+  vat: 'vatRate',
+};
+
+const EMPTY_PRODUCT_STATS: ProductStats = {
+  activeProducts: 0,
+  averageDayRateHt: 0,
+  catalogValueHt: 0,
+  productsByCategory: {},
+};
+
 type CategorySortKey = 'code' | 'label' | 'sortOrder' | 'products';
 
 interface ProductInlineDraft {
   name: string;
   categoryId: string;
-  billingType: EditableBillingType;
+  billingType: BillingType;
+  /** Vide = libellé par défaut du mode. */
+  unitLabel: string;
   unitPriceHt: number;
   vatRate: number;
 }
@@ -62,6 +87,8 @@ interface ProductInlineDraft {
     IconActionComponent,
     LucideIconComponent,
     SortableThComponent,
+    PaginatorComponent,
+    SearchSelectComponent,
   ],
   templateUrl: './products-list-page.component.html',
 })
@@ -69,16 +96,21 @@ export class ProductsListPageComponent implements OnInit {
   private readonly api = inject(ProductsApiService);
   private readonly categoriesApi = inject(ProductCategoriesApiService);
   private readonly packagesApi = inject(CatalogPackagesApiService);
-  private readonly workspaces = inject(WorkspaceService);
+  readonly workspaces = inject(WorkspaceService);
   private readonly fb = inject(FormBuilder);
   private readonly route = inject(ActivatedRoute);
+  private readonly destroyRef = inject(DestroyRef);
+  private readonly searchInput$ = new Subject<string>();
 
   readonly palette = CATEGORY_COLOR_PALETTE;
+  readonly billingOptions = BILLING_TYPE_OPTIONS;
 
   readonly loading = signal(false);
   readonly saving = signal(false);
   readonly error = signal<string | null>(null);
   readonly items = signal<Product[]>([]);
+  readonly page = new PageState();
+  readonly productStats = signal<ProductStats>(EMPTY_PRODUCT_STATS);
   readonly categories = signal<ProductCategory[]>([]);
   readonly deletingId = signal<string | null>(null);
   readonly duplicatingId = signal<string | null>(null);
@@ -90,6 +122,9 @@ export class ProductsListPageComponent implements OnInit {
   readonly showPackageModal = signal(false);
   readonly editingPackageId = signal<string | null>(null);
   readonly packageFormItems = signal<CatalogPackageItemPayload[]>([]);
+  /** Produits référencés par le package en cours d'édition (indépendant de la page affichée). */
+  private readonly packageProducts = signal<ReadonlyMap<string, Product>>(new Map());
+  readonly productPicker = productPickerSource(this.api, this.workspaces);
 
   readonly filterQ = signal('');
   readonly filterCategoryId = signal('');
@@ -130,71 +165,16 @@ export class ProductsListPageComponent implements OnInit {
   readonly inlineCatCode = signal('');
   readonly inlineCatSortOrder = signal(0);
 
+  /** KPI globaux (serveur) — indépendants des filtres et de la page affichée. */
   readonly stats = computed(() => {
-    const products = this.items();
-    const visible = products.filter((p) => (this.filterActiveOnly() ? p.active : true));
-    const dayRates = visible.filter((p) => parseBillingFromDescription(p.description).type === 'DAYS');
-    const avgTjm =
-      dayRates.length > 0
-        ? Math.round(dayRates.reduce((acc, p) => acc + p.unitPriceHt, 0) / dayRates.length)
-        : 0;
-    const totalCatalogValue = visible.reduce((acc, p) => acc + p.unitPriceHt, 0);
+    const s = this.productStats();
     return {
-      totalProds: visible.length,
+      totalProds: s.activeProducts,
       totalPkgs: this.packages().length,
       totalCats: this.categories().length,
-      avgTjm,
-      totalCatalogValue,
+      avgTjm: Math.round(s.averageDayRateHt),
+      totalCatalogValue: s.catalogValueHt,
     };
-  });
-
-  readonly filteredProducts = computed(() => {
-    const q = this.filterQ().trim().toLowerCase();
-    const catId = this.filterCategoryId();
-    const onlyActive = this.filterActiveOnly();
-    return this.items().filter((p) => {
-      const matchesSearch =
-        !q ||
-        p.name.toLowerCase().includes(q) ||
-        p.referenceCode.toLowerCase().includes(q) ||
-        (p.description?.toLowerCase().includes(q) ?? false);
-      const matchesCategory = !catId || p.categoryId === catId;
-      const matchesActive = onlyActive ? p.active : true;
-      return matchesSearch && matchesCategory && matchesActive;
-    });
-  });
-
-  readonly sortedFilteredProducts = computed(() => {
-    const list = [...this.filteredProducts()];
-    const key = this.productSortKey();
-    const mul = sortMultiplier(this.productSortDir());
-    const catLabels = new Map(this.categories().map((c) => [c.id, c.label]));
-
-    list.sort((a, b) => {
-      let cmp = 0;
-      switch (key) {
-        case 'referenceCode':
-          cmp = a.referenceCode.localeCompare(b.referenceCode, 'fr');
-          break;
-        case 'name':
-          cmp = a.name.localeCompare(b.name, 'fr');
-          break;
-        case 'category': {
-          const la = a.categoryId ? (catLabels.get(a.categoryId) ?? '') : '';
-          const lb = b.categoryId ? (catLabels.get(b.categoryId) ?? '') : '';
-          cmp = la.localeCompare(lb, 'fr');
-          break;
-        }
-        case 'price':
-          cmp = a.unitPriceHt - b.unitPriceHt;
-          break;
-        case 'vat':
-          cmp = a.vatRate - b.vatRate;
-          break;
-      }
-      return cmp * mul;
-    });
-    return list;
   });
 
   readonly sortedCategories = computed(() => {
@@ -223,8 +203,17 @@ export class ProductsListPageComponent implements OnInit {
   });
 
   constructor() {
+    this.searchInput$
+      .pipe(debounceTime(300), distinctUntilChanged(), takeUntilDestroyed(this.destroyRef))
+      .subscribe((q) => {
+        this.filterQ.set(q);
+        this.page.reset();
+        this.reloadProducts();
+      });
+
     effect(() => {
       this.workspaces.generation();
+      this.page.reset();
       this.loadCategories();
       this.reloadProducts();
       this.reloadPackages();
@@ -246,6 +235,18 @@ export class ProductsListPageComponent implements OnInit {
     const k = key as ProductSortKey;
     this.productSortDir.set(nextSortDirection(this.productSortKey(), k, this.productSortDir()));
     this.productSortKey.set(k);
+    this.page.reset();
+    this.reloadProducts();
+  }
+
+  onPageChange(index: number): void {
+    this.page.goTo(index);
+    this.reloadProducts();
+  }
+
+  onPageSizeChange(size: number): void {
+    this.page.setSize(size);
+    this.reloadProducts();
   }
 
   onCategorySort(key: string): void {
@@ -259,10 +260,16 @@ export class ProductsListPageComponent implements OnInit {
     this.productEditDraft.set({
       name: p.name,
       categoryId: p.categoryId ?? '',
-      billingType: editableBillingFromDescription(p.description),
+      billingType: p.billingType,
+      unitLabel: p.unitLabel === defaultUnitLabel(p.billingType) ? '' : p.unitLabel,
       unitPriceHt: p.unitPriceHt,
       vatRate: p.vatRate,
     });
+  }
+
+  /** Changement de mode : l'unité personnalisée est réinitialisée vers le défaut du nouveau mode. */
+  patchDraftBillingType(type: BillingType): void {
+    this.patchProductDraft({ billingType: type, unitLabel: '' });
   }
 
   cancelProductInlineEdit(): void {
@@ -289,11 +296,13 @@ export class ProductsListPageComponent implements OnInit {
         workspaceId,
         referenceCode: p.referenceCode,
         name: draft.name.trim(),
-        description: applyBillingTypeToDescription(p.description, draft.billingType),
+        description: p.description,
         categoryId: draft.categoryId || null,
         unitPriceHt: draft.unitPriceHt,
         vatRate: draft.vatRate,
         active: p.active,
+        billingType: draft.billingType,
+        unitLabel: draft.unitLabel.trim() || null,
       })
       .subscribe({
         next: () => {
@@ -317,19 +326,24 @@ export class ProductsListPageComponent implements OnInit {
   }
 
   onSearchInput(value: string): void {
-    this.filterQ.set(value);
+    this.searchInput$.next(value);
   }
 
   clearSearch(): void {
     this.filterQ.set('');
+    this.searchInput$.next('');
   }
 
   onCategoryFilterChange(value: string): void {
     this.filterCategoryId.set(value);
+    this.page.reset();
+    this.reloadProducts();
   }
 
   onActiveOnlyChange(checked: boolean): void {
     this.filterActiveOnly.set(checked);
+    this.page.reset();
+    this.reloadProducts();
   }
 
   loadCategories(): void {
@@ -368,6 +382,7 @@ export class ProductsListPageComponent implements OnInit {
     });
   }
 
+  /** Liste paginée + KPI globaux (les KPI dépendent des produits, pas des filtres). */
   reloadProducts(): void {
     const workspaceId = this.workspaces.selectedId();
     if (!workspaceId) {
@@ -375,12 +390,33 @@ export class ProductsListPageComponent implements OnInit {
     }
     const gen = this.workspaces.generation();
     this.loading.set(true);
-    this.api.search(workspaceId, { activeOnly: false, size: 500 }).subscribe({
+    this.api.stats(workspaceId).subscribe({
+      next: (stats) => {
+        if (!this.workspaces.isStale(gen)) {
+          this.productStats.set(stats);
+        }
+      },
+      error: () => {
+        if (!this.workspaces.isStale(gen)) {
+          this.productStats.set(EMPTY_PRODUCT_STATS);
+        }
+      },
+    });
+    const sort = sortParam(PRODUCT_SORT_PROPERTIES[this.productSortKey()], this.productSortDir());
+    this.api
+      .search(workspaceId, {
+        q: this.filterQ().trim() || undefined,
+        activeOnly: this.filterActiveOnly(),
+        categoryId: this.filterCategoryId() || undefined,
+        ...this.page.query(sort),
+      })
+      .subscribe({
       next: (page) => {
         if (this.workspaces.isStale(gen)) {
           return;
         }
         this.items.set(page.content);
+        this.page.apply(page);
         this.loading.set(false);
       },
       error: (err) => {
@@ -413,19 +449,8 @@ export class ProductsListPageComponent implements OnInit {
     return productShortDescription(product.description);
   }
 
-  billing(product: Product): { type: BillingType; unitLabel: string } {
-    return parseBillingFromDescription(product.description);
-  }
-
-  draftBillingUnitLabel(type: EditableBillingType): string {
-    switch (type) {
-      case 'DAYS':
-        return 'jours';
-      case 'RECURRING':
-        return 'mois';
-      default:
-        return 'forfait';
-    }
+  draftUnitPlaceholder(type: BillingType): string {
+    return defaultUnitLabel(type);
   }
 
   priceFormatted(value: number): string {
@@ -433,7 +458,7 @@ export class ProductsListPageComponent implements OnInit {
   }
 
   productCountForCategory(categoryId: string): number {
-    return this.items().filter((p) => p.categoryId === categoryId).length;
+    return this.productStats().productsByCategory[categoryId] ?? 0;
   }
 
   openNewCategoryModal(): void {
@@ -531,6 +556,7 @@ export class ProductsListPageComponent implements OnInit {
     this.api.delete(p.id).subscribe({
       next: () => {
         this.deletingId.set(null);
+        this.page.adjustAfterRemoval();
         this.reloadProducts();
       },
       error: (err) => {
@@ -541,6 +567,7 @@ export class ProductsListPageComponent implements OnInit {
   }
 
   openPackageModal(pkg?: CatalogPackage): void {
+    this.packageProducts.set(new Map());
     if (pkg) {
       this.editingPackageId.set(pkg.id);
       this.packageForm.patchValue({
@@ -553,6 +580,7 @@ export class ProductsListPageComponent implements OnInit {
         active: pkg.active,
       });
       this.packageFormItems.set(pkg.items.map((i) => ({ productId: i.productId, quantity: i.quantity })));
+      this.loadPackageProducts(pkg.items.map((i) => i.productId));
     } else {
       this.editingPackageId.set(null);
       this.packageForm.reset({
@@ -574,11 +602,43 @@ export class ProductsListPageComponent implements OnInit {
     this.showPackageModal.set(false);
   }
 
+  onPackageProductPicked(product: Product | null): void {
+    if (!product) {
+      return;
+    }
+    this.rememberPackageProducts([product]);
+    this.addProductToPackageForm(product.id);
+  }
+
   addProductToPackageForm(productId: string): void {
     if (!productId || this.packageFormItems().some((i) => i.productId === productId)) {
       return;
     }
     this.packageFormItems.update((items) => [...items, { productId, quantity: 1 }]);
+  }
+
+  packageProduct(productId: string): Product | undefined {
+    return this.packageProducts().get(productId) ?? this.productById(productId);
+  }
+
+  private rememberPackageProducts(list: readonly Product[]): void {
+    this.packageProducts.update((map) => {
+      const next = new Map(map);
+      for (const p of list) {
+        next.set(p.id, p);
+      }
+      return next;
+    });
+  }
+
+  private loadPackageProducts(ids: readonly string[]): void {
+    const missing = ids.filter((id) => !this.packageProduct(id));
+    if (!missing.length) {
+      return;
+    }
+    forkJoin(missing.map((id) => this.api.get(id).pipe(catchError(() => of(null))))).subscribe((list) =>
+      this.rememberPackageProducts(list.filter((p): p is Product => !!p)),
+    );
   }
 
   removeProductFromPackageForm(productId: string): void {
@@ -648,7 +708,7 @@ export class ProductsListPageComponent implements OnInit {
   }
 
   packageLineTotal(productId: string, quantity: number): number {
-    const p = this.productById(productId);
+    const p = this.packageProduct(productId);
     return p ? p.unitPriceHt * quantity : 0;
   }
 
@@ -691,6 +751,8 @@ export class ProductsListPageComponent implements OnInit {
         unitPriceHt: p.unitPriceHt,
         vatRate: p.vatRate,
         active: p.active,
+        billingType: p.billingType,
+        unitLabel: p.unitLabel,
       })
       .subscribe({
         next: () => {

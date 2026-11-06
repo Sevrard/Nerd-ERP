@@ -1,9 +1,11 @@
 package com.nerd.erp.application.catalog;
 
+import com.nerd.erp.domain.catalog.BillingType;
 import com.nerd.erp.domain.catalog.Product;
 import com.nerd.erp.domain.catalog.ProductCategory;
 import com.nerd.erp.api.catalog.ProductRequest;
 import com.nerd.erp.api.catalog.ProductResponse;
+import com.nerd.erp.api.catalog.ProductStatsResponse;
 import com.nerd.erp.infrastructure.persistence.catalog.CatalogPackageItemRepository;
 import com.nerd.erp.infrastructure.persistence.catalog.ProductCategoryRepository;
 import com.nerd.erp.infrastructure.persistence.catalog.ProductRepository;
@@ -19,6 +21,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -65,6 +70,22 @@ public class ProductService {
                 : productRepository.searchByWorkspace(tenantId, workspaceId, activeOnly, categoryId,
                 "%" + term.toLowerCase() + "%", pageable);
         return PageResponse.from(page.map(p -> toResponse(p, categoryLabels)));
+    }
+
+    @Transactional(readOnly = true)
+    public ProductStatsResponse stats(UUID workspaceId) {
+        UUID tenantId = SecurityContextHelper.requireTenantId();
+        workspaceService.requireInTenant(workspaceId, tenantId);
+        Map<UUID, Long> byCategory = new HashMap<>();
+        for (Object[] row : productRepository.countByCategory(tenantId, workspaceId)) {
+            byCategory.put((UUID) row[0], (Long) row[1]);
+        }
+        Double avgDayRate = productRepository.averageActiveDayRate(tenantId, workspaceId);
+        return new ProductStatsResponse(
+                productRepository.countByTenantIdAndWorkspaceIdAndActiveTrue(tenantId, workspaceId),
+                avgDayRate == null ? BigDecimal.ZERO : BigDecimal.valueOf(avgDayRate).setScale(2, RoundingMode.HALF_UP),
+                productRepository.sumActiveUnitPriceHt(tenantId, workspaceId),
+                byCategory);
     }
 
     @Transactional(readOnly = true)
@@ -141,6 +162,9 @@ public class ProductService {
         if (request.active() != null) {
             product.setActive(request.active());
         }
+        product.setBillingType(request.billingType() != null ? request.billingType() : BillingType.UNIT);
+        String unitLabel = request.unitLabel() == null ? null : request.unitLabel().trim();
+        product.setUnitLabel(unitLabel == null || unitLabel.isEmpty() ? null : unitLabel);
         if (request.categoryId() != null) {
             categoryService.requireCategoryInWorkspace(
                     request.categoryId(), request.workspaceId(), product.getTenantId());
@@ -160,6 +184,7 @@ public class ProductService {
         UUID categoryId = p.getCategoryId();
         String categoryLabel = categoryId != null ? categoryLabels.get(categoryId) : null;
         return new ProductResponse(p.getId(), p.getWorkspaceId(), p.getReferenceCode(), p.getName(),
-                p.getDescription(), p.getUnitPriceHt(), p.getVatRate(), p.isActive(), categoryId, categoryLabel);
+                p.getDescription(), p.getUnitPriceHt(), p.getVatRate(), p.isActive(), categoryId, categoryLabel,
+                p.getBillingType(), p.effectiveUnitLabel());
     }
 }

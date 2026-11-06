@@ -1,16 +1,17 @@
-import { Component, computed, effect, inject, OnInit, signal } from '@angular/core';
-import { toSignal } from '@angular/core/rxjs-interop';
+import { Component, computed, effect, inject, OnInit, signal, untracked } from '@angular/core';
+import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { FormArray, FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { startWith } from 'rxjs';
+import { forkJoin, of, startWith, Subject } from 'rxjs';
+import { catchError, debounceTime, distinctUntilChanged, switchMap, tap } from 'rxjs/operators';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { WorkspaceService } from '../../core/workspace/workspace.service';
 import { CatalogPackagesApiService } from '../products/catalog-packages-api.service';
 import { ProductCategoriesApiService } from '../products/product-categories-api.service';
 import {
+  billingSummary,
   formatPriceHt,
   loadCategoryColorMap,
   packageBadgeClasses,
-  parseBillingFromDescription,
   productShortDescription,
   resolveCategoryColor,
 } from '../products/product-catalog.util';
@@ -18,7 +19,9 @@ import { ProductsApiService } from '../products/products-api.service';
 import { CustomersApiService } from '../customers/customers-api.service';
 import { Customer, customerDisplayName } from '../../shared/models/customer.model';
 import { CatalogPackage } from '../../shared/models/catalog-package.model';
+import { emptyPage } from '../../shared/models/page.model';
 import { Product } from '../../shared/models/product.model';
+import { SEARCH_SELECT_LIMIT } from '../../shared/ui/search-select.component';
 import { ProductCategory } from '../../shared/models/product-category.model';
 import { Quotation, QuotationPayload } from '../../shared/models/quotation.model';
 import { formatMoney, lineTotals } from '../../shared/utils/money.util';
@@ -27,10 +30,13 @@ import { LoadingStateComponent } from '../../shared/ui/loading-state.component';
 import { LucideIconComponent } from '../../shared/ui/lucide-icon.component';
 import { QuotationsApiService } from './quotations-api.service';
 import { QuotationDocumentPreviewComponent, QuotationPreviewViewMode } from './quotation-document-preview.component';
-import { QuotationPreviewLine } from './quotation-preview.model';
+import { QuotationPreviewLine, QuotationPreviewTotals } from './quotation-preview.model';
 import { apiErrorMessage } from '../../shared/utils/api-error.util';
 
 type CatalogTab = 'products' | 'packages';
+
+/** Nombre de prestations affichées dans le catalogue de l'éditeur ; au-delà, l'utilisateur filtre. */
+const CATALOG_PAGE_SIZE = 50;
 
 @Component({
   selector: 'app-quotations-editor-page',
@@ -61,10 +67,17 @@ export class QuotationsEditorPageComponent implements OnInit {
   readonly catalogLoading = signal(false);
   readonly saving = signal(false);
   readonly actionBusy = signal(false);
+  readonly downloadingPdf = signal(false);
   readonly error = signal<string | null>(null);
   readonly quotation = signal<Quotation | null>(null);
+  /** Résultats de la recherche client courante (serveur). */
   readonly customers = signal<Customer[]>([]);
+  /** Résultats de la recherche catalogue courante (serveur, produits actifs). */
   readonly products = signal<Product[]>([]);
+  /** Tous les produits rencontrés (recherches, lignes chargées, packages) pour résoudre les lignes. */
+  private readonly knownProducts = signal<ReadonlyMap<string, Product>>(new Map());
+  /** Client sélectionné chargé par identifiant quand il n'est pas dans les résultats courants. */
+  private readonly resolvedCustomer = signal<Customer | null>(null);
   readonly categories = signal<ProductCategory[]>([]);
   readonly packages = signal<CatalogPackage[]>([]);
   readonly categoryColorMap = signal(loadCategoryColorMap());
@@ -79,11 +92,19 @@ export class QuotationsEditorPageComponent implements OnInit {
   readonly lineEditorOpen = signal(true);
   readonly toast = signal<string | null>(null);
 
+  /** Acompte proposé par défaut sur un nouveau devis (% du TTC). */
+  private static readonly DEFAULT_DEPOSIT_PERCENT = 30;
+
   readonly form = this.fb.nonNullable.group({
     customerId: ['', Validators.required],
     issueDate: [''],
     validUntil: [''],
     notes: [''],
+    discountPercent: [0, [Validators.min(0), Validators.max(100)]],
+    depositPercent: [
+      QuotationsEditorPageComponent.DEFAULT_DEPOSIT_PERCENT,
+      [Validators.min(0), Validators.max(100)],
+    ],
     lines: this.fb.array([this.newLineGroup()]),
   });
 
@@ -98,6 +119,10 @@ export class QuotationsEditorPageComponent implements OnInit {
     if (!id) {
       return null;
     }
+    const resolved = this.resolvedCustomer();
+    if (resolved?.id === id) {
+      return resolved;
+    }
     return this.customers().find((c) => c.id === id) ?? null;
   });
 
@@ -110,45 +135,16 @@ export class QuotationsEditorPageComponent implements OnInit {
     return this.workspaces.selectedWorkspace();
   });
 
-  readonly filteredClients = computed(() => {
-    const q = this.clientSearch().trim().toLowerCase();
-    if (!q) {
-      return this.customers().filter((c) => !c.archived).slice(0, 12);
-    }
-    return this.customers()
-      .filter((c) => !c.archived)
-      .filter((c) => {
-        const haystack = [
-          customerDisplayName(c),
-          c.email ?? '',
-          c.phone ?? '',
-          c.companyName ?? '',
-          c.city ?? '',
-          c.postalCode ?? '',
-        ]
-          .join(' ')
-          .toLowerCase();
-        return haystack.includes(q);
-      })
-      .slice(0, 12);
-  });
+  /** Résultats client (recherche serveur, non archivés). */
+  readonly filteredClients = computed(() => this.customers().filter((c) => !c.archived));
+  readonly clientSearching = signal(false);
 
-  readonly filteredCatalogProducts = computed(() => {
-    const q = this.catalogSearch().trim().toLowerCase();
-    const catId = this.catalogCategoryId();
-    return this.products().filter((p) => {
-      if (!p.active) {
-        return false;
-      }
-      const matchesCat = !catId || p.categoryId === catId;
-      const matchesQ =
-        !q ||
-        p.name.toLowerCase().includes(q) ||
-        p.referenceCode.toLowerCase().includes(q) ||
-        (p.description?.toLowerCase().includes(q) ?? false);
-      return matchesCat && matchesQ;
-    });
-  });
+  /** Résultats catalogue (recherche + catégorie côté serveur). */
+  readonly filteredCatalogProducts = computed(() => this.products());
+  readonly catalogSearching = signal(false);
+
+  private readonly clientSearch$ = new Subject<string>();
+  private readonly catalogSearch$ = new Subject<{ q: string; categoryId: string }>();
 
   readonly lineCount = computed(() => this.lines.length);
 
@@ -158,6 +154,51 @@ export class QuotationsEditorPageComponent implements OnInit {
   });
 
   constructor() {
+    this.clientSearch$
+      .pipe(
+        debounceTime(250),
+        distinctUntilChanged(),
+        tap(() => this.clientSearching.set(true)),
+        switchMap((q) =>
+          this.customersApi
+            .search(this.workspaces.requireSelectedId(), {
+              q: q || undefined,
+              size: SEARCH_SELECT_LIMIT,
+              sort: 'companyName,lastName,firstName,asc',
+            })
+            .pipe(catchError(() => of(emptyPage<Customer>()))),
+        ),
+        takeUntilDestroyed(),
+      )
+      .subscribe((page) => {
+        this.customers.set(page.content);
+        this.clientSearching.set(false);
+      });
+
+    this.catalogSearch$
+      .pipe(
+        debounceTime(250),
+        distinctUntilChanged((a, b) => a.q === b.q && a.categoryId === b.categoryId),
+        tap(() => this.catalogSearching.set(true)),
+        switchMap(({ q, categoryId }) =>
+          this.productsApi
+            .search(this.workspaces.requireSelectedId(), {
+              q: q || undefined,
+              categoryId: categoryId || undefined,
+              activeOnly: true,
+              size: CATALOG_PAGE_SIZE,
+              sort: 'name,asc',
+            })
+            .pipe(catchError(() => of(emptyPage<Product>()))),
+        ),
+        takeUntilDestroyed(),
+      )
+      .subscribe((page) => {
+        this.products.set(page.content);
+        this.rememberProducts(page.content);
+        this.catalogSearching.set(false);
+      });
+
     effect(() => {
       const ws = this.workspaces.selectedId();
       const gen = this.workspaces.generation();
@@ -166,14 +207,62 @@ export class QuotationsEditorPageComponent implements OnInit {
       }
       this.workspaces.refreshWorkspace(ws).subscribe();
       this.loadCatalog(ws, gen);
-      this.customersApi.search(ws, { size: 500 }).subscribe({
-        next: (page) => {
-          if (this.workspaces.isStale(gen)) {
-            return;
-          }
-          this.customers.set(page.content);
-        },
+      this.clientSearch$.next(this.clientSearch().trim());
+      this.catalogSearch$.next({ q: this.catalogSearch().trim(), categoryId: this.catalogCategoryId() });
+    });
+
+    // Client positionné (chargement d'un devis) sans être dans les résultats : on le charge par id.
+    effect(() => {
+      const id = this.customerId();
+      const current = this.resolvedCustomer();
+      if (!id || current?.id === id) {
+        return;
+      }
+      const inResults = untracked(() => this.customers().find((c) => c.id === id));
+      if (inResults) {
+        this.resolvedCustomer.set(inResults);
+        return;
+      }
+      this.customersApi.get(id).subscribe({
+        next: (c) => this.resolvedCustomer.set(c),
+        error: () => undefined,
       });
+    });
+  }
+
+  onCatalogSearchInput(value: string): void {
+    this.catalogSearch.set(value);
+    this.catalogSearch$.next({ q: value.trim(), categoryId: this.catalogCategoryId() });
+  }
+
+  onCatalogCategoryChange(value: string): void {
+    this.catalogCategoryId.set(value);
+    this.catalogSearch$.next({ q: this.catalogSearch().trim(), categoryId: value });
+  }
+
+  private rememberProducts(list: readonly Product[]): void {
+    if (!list.length) {
+      return;
+    }
+    this.knownProducts.update((map) => {
+      const next = new Map(map);
+      for (const p of list) {
+        next.set(p.id, p);
+      }
+      return next;
+    });
+  }
+
+  /** Charge par identifiant les produits référencés mais encore inconnus (lignes, packages). */
+  private ensureProductsLoaded(ids: readonly (string | null | undefined)[], done?: () => void): void {
+    const missing = [...new Set(ids.filter((id): id is string => !!id && !this.knownProducts().has(id)))];
+    if (!missing.length) {
+      done?.();
+      return;
+    }
+    forkJoin(missing.map((id) => this.productsApi.get(id).pipe(catchError(() => of(null))))).subscribe((list) => {
+      this.rememberProducts(list.filter((p): p is Product => !!p));
+      done?.();
     });
   }
 
@@ -248,7 +337,7 @@ export class QuotationsEditorPageComponent implements OnInit {
     if (!id) {
       return undefined;
     }
-    return this.products().find((p) => p.id === id);
+    return this.knownProducts().get(id);
   }
 
   issuerAddressLine(): string {
@@ -267,30 +356,16 @@ export class QuotationsEditorPageComponent implements OnInit {
   }
 
   productUnitLabel(product: Product): string {
-    return parseBillingFromDescription(product.description).unitLabel;
+    return product.unitLabel;
   }
 
   billingLabel(product: Product): string {
-    const bill = parseBillingFromDescription(product.description);
-    switch (bill.type) {
-      case 'DAYS':
-        return `TJM / ${bill.unitLabel}`;
-      case 'RECURRING':
-        return `Récurrent / ${bill.unitLabel}`;
-      case 'FIXED_PRICE':
-        return 'Forfait';
-      default:
-        return bill.unitLabel;
-    }
+    return billingSummary(product);
   }
 
   unitLabelForLine(index: number): string {
     const productId = this.lines.at(index).get('productId')?.value as string;
-    const p = this.productById(productId);
-    if (p) {
-      return parseBillingFromDescription(p.description).unitLabel;
-    }
-    return 'unité';
+    return this.productById(productId)?.unitLabel ?? 'unité';
   }
 
   shortDescription(product: Product): string {
@@ -336,34 +411,63 @@ export class QuotationsEditorPageComponent implements OnInit {
     return formatMoney(lineTotals(Number(g.quantity), Number(g.unitPriceHt), Number(g.vatRate)).ht);
   }
 
-  displayTotals(): { ht: string; vat: string; ttc: string; htNum: number; vatNum: number; ttcNum: number } {
+  discountPercentValue(): number {
+    return this.clampPercent(this.form.controls.discountPercent.value);
+  }
+
+  depositPercentValue(): number {
+    return this.clampPercent(this.form.controls.depositPercent.value);
+  }
+
+  /**
+   * Totaux affichés : sous-total brut, remise globale (même coefficient appliqué au HT et à la TVA,
+   * comme `MoneyCalculator.applyDiscount` côté serveur), puis nets.
+   */
+  displayTotals(): QuotationPreviewTotals {
     const raw = this.lines.getRawValue();
-    let ht = 0;
-    let vat = 0;
-    let ttc = 0;
+    let grossHt = 0;
+    let grossVat = 0;
     for (const l of raw) {
       const t = lineTotals(Number(l.quantity), Number(l.unitPriceHt), Number(l.vatRate));
-      ht += t.ht;
-      vat += t.vat;
-      ttc += t.ttc;
+      grossHt += t.ht;
+      grossVat += t.vat;
     }
+    const pct = this.discountPercentValue();
+    const discount = Math.round(grossHt * pct) / 100;
+    const ht = grossHt - discount;
+    const vat = grossVat - Math.round(grossVat * pct) / 100;
+    const ttc = ht + vat;
     return {
+      subtotalHt: formatMoney(grossHt),
+      discount: formatMoney(discount),
       ht: formatMoney(ht),
       vat: formatMoney(vat),
       ttc: formatMoney(ttc),
+      subtotalHtNum: grossHt,
+      discountNum: discount,
       htNum: ht,
       vatNum: vat,
       ttcNum: ttc,
     };
   }
 
+  private clampPercent(value: unknown): number {
+    const n = Number(value);
+    if (!Number.isFinite(n) || n <= 0) {
+      return 0;
+    }
+    return Math.min(100, n);
+  }
+
   onClientSearchInput(value: string): void {
     this.clientSearch.set(value);
     this.clientDropdownOpen.set(true);
+    this.clientSearch$.next(value.trim());
   }
 
   openClientDropdown(): void {
     this.clientDropdownOpen.set(true);
+    this.clientSearch$.next(this.clientSearch().trim());
   }
 
   closeClientDropdown(): void {
@@ -374,6 +478,7 @@ export class QuotationsEditorPageComponent implements OnInit {
     if (!this.editable()) {
       return;
     }
+    this.resolvedCustomer.set(c);
     this.form.patchValue({ customerId: c.id });
     this.clientSearch.set('');
     this.clientDropdownOpen.set(false);
@@ -410,6 +515,13 @@ export class QuotationsEditorPageComponent implements OnInit {
     if (!this.editable()) {
       return;
     }
+    this.ensureProductsLoaded(
+      pkg.items.map((i) => i.productId),
+      () => this.injectLoadedPackage(pkg),
+    );
+  }
+
+  private injectLoadedPackage(pkg: CatalogPackage): void {
     for (const item of pkg.items) {
       const product = this.productById(item.productId);
       if (!product) {
@@ -512,6 +624,50 @@ export class QuotationsEditorPageComponent implements OnInit {
     requestAnimationFrame(() => window.print());
   }
 
+  /**
+   * PDF généré côté serveur à partir du devis enregistré : tant que le devis est un brouillon,
+   * on l'enregistre d'abord pour que le PDF reflète exactement l'écran (les ajouts depuis le
+   * catalogue ne marquent pas le formulaire « dirty », d'où la sauvegarde systématique).
+   */
+  downloadPdf(): void {
+    if (this.downloadingPdf() || this.saving()) {
+      return;
+    }
+    if (this.editable()) {
+      if (this.form.invalid) {
+        this.error.set('Complétez le devis (client et lignes) avant de générer le PDF.');
+        return;
+      }
+      this.saveDraftInternal(() => this.fetchPdf());
+      return;
+    }
+    this.fetchPdf();
+  }
+
+  private fetchPdf(): void {
+    const id = this.quotationId;
+    if (!id) {
+      return;
+    }
+    this.downloadingPdf.set(true);
+    this.api.downloadPdf(id).subscribe({
+      next: (blob) => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `devis-${this.quotation()?.number ?? 'brouillon'}.pdf`;
+        a.click();
+        URL.revokeObjectURL(url);
+        this.downloadingPdf.set(false);
+        this.notify('PDF généré');
+      },
+      error: (err) => {
+        this.error.set(apiErrorMessage(err, 'Génération du PDF impossible'));
+        this.downloadingPdf.set(false);
+      },
+    });
+  }
+
   previewStatusBadge(): string {
     const q = this.quotation();
     if (!q) {
@@ -582,6 +738,8 @@ export class QuotationsEditorPageComponent implements OnInit {
       issueDate: '',
       validUntil: '',
       notes: '',
+      discountPercent: 0,
+      depositPercent: QuotationsEditorPageComponent.DEFAULT_DEPOSIT_PERCENT,
     });
     this.lines.clear();
     this.lines.push(this.newLineGroup());
@@ -604,6 +762,7 @@ export class QuotationsEditorPageComponent implements OnInit {
           void this.router.navigate(['/quotations', q.id]);
         }
         this.quotationId = q.id;
+        this.form.markAsPristine();
         this.saving.set(false);
         this.notify('Devis enregistré');
       },
@@ -701,6 +860,7 @@ export class QuotationsEditorPageComponent implements OnInit {
           this.quotationId = q.id;
           void this.router.navigate(['/quotations', q.id], { replaceUrl: true });
         }
+        this.form.markAsPristine();
         this.saving.set(false);
         done();
       },
@@ -713,14 +873,6 @@ export class QuotationsEditorPageComponent implements OnInit {
 
   private loadCatalog(workspaceId: string, gen: number): void {
     this.catalogLoading.set(true);
-    this.productsApi.search(workspaceId, { activeOnly: true, size: 500 }).subscribe({
-      next: (page) => {
-        if (this.workspaces.isStale(gen)) {
-          return;
-        }
-        this.products.set(page.content);
-      },
-    });
     this.categoriesApi.list(workspaceId).subscribe({
       next: (list) => {
         if (this.workspaces.isStale(gen)) {
@@ -752,6 +904,7 @@ export class QuotationsEditorPageComponent implements OnInit {
       next: (q) => {
         this.quotation.set(q);
         this.patchForm(q);
+        this.ensureProductsLoaded(q.lines.map((l) => l.productId));
         this.workspaces.refreshWorkspace(q.workspaceId).subscribe();
         this.loading.set(false);
       },
@@ -783,12 +936,15 @@ export class QuotationsEditorPageComponent implements OnInit {
       issueDate: q.issueDate ?? '',
       validUntil: q.validUntil ?? '',
       notes: q.notes ?? '',
+      discountPercent: Number(q.discountPercent ?? 0),
+      depositPercent: Number(q.depositPercent ?? 0),
     });
     if (q.status !== 'DRAFT') {
       this.form.disable();
     } else {
       this.form.enable();
     }
+    this.form.markAsPristine();
   }
 
   private buildPayload(): QuotationPayload {
@@ -798,6 +954,8 @@ export class QuotationsEditorPageComponent implements OnInit {
       issueDate: this.form.value.issueDate || null,
       validUntil: this.form.value.validUntil || null,
       notes: this.form.value.notes || null,
+      discountPercent: this.discountPercentValue(),
+      depositPercent: this.depositPercentValue(),
       lines: this.lines
         .getRawValue()
         .filter((l) => l.description?.trim())

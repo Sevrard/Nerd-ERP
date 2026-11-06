@@ -1,7 +1,8 @@
 import { Component, input, output } from '@angular/core';
-import { Customer } from '../../shared/models/customer.model';
+import { CustomerPickerSource } from '../customers/customer-picker.util';
 import { InvoiceScanImportError, InvoiceScanPendingRow } from '../../shared/models/invoice-scan.model';
 import { IconActionComponent } from '../../shared/ui/icon-action.component';
+import { SearchSelectComponent } from '../../shared/ui/search-select.component';
 import { formatMoney } from '../../shared/utils/money.util';
 
 export interface InvoiceScanRowPatchEvent {
@@ -12,7 +13,7 @@ export interface InvoiceScanRowPatchEvent {
 @Component({
   selector: 'app-invoice-scan-review-modal',
   standalone: true,
-  imports: [IconActionComponent],
+  imports: [IconActionComponent, SearchSelectComponent],
   template: `
     <div class="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 p-2 sm:p-4" role="dialog" aria-modal="true">
       <div
@@ -82,19 +83,34 @@ export interface InvoiceScanRowPatchEvent {
                           (input)="emitPatch(row.scanId, { invoiceNumber: inputValue($event) })"
                         />
                       </td>
-                      <td class="px-3 py-3">
-                        <select
-                          class="max-w-[220px] rounded border border-slate-700 bg-slate-950 px-2 py-1.5 text-white"
-                          [value]="row.customerSelection"
-                          (change)="emitPatch(row.scanId, { customerSelection: selectValue($event) })"
-                        >
-                          <option [value]="createClientValue()">
-                            + Créer « {{ row.extractedClientLabel }} »
-                          </option>
-                          @for (c of customers(); track c.id) {
-                            <option [value]="c.id">{{ customerOptionLabel(c) }}</option>
-                          }
-                        </select>
+                      <td class="w-64 px-3 py-3">
+                        @if (row.customerSelection === createClientValue()) {
+                          <div
+                            class="flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-300"
+                          >
+                            <span class="min-w-0 flex-1 truncate">+ Créer « {{ row.extractedClientLabel }} »</span>
+                            <button
+                              type="button"
+                              class="shrink-0 text-emerald-400/70 hover:text-white"
+                              aria-label="Choisir un client existant"
+                              (click)="emitPatch(row.scanId, { customerSelection: '' })"
+                            >
+                              ×
+                            </button>
+                          </div>
+                        } @else {
+                          <app-search-select
+                            [value]="row.customerSelection || null"
+                            [search]="customerPicker().search"
+                            [resolve]="customerPicker().resolve"
+                            [labelFn]="customerPicker().label"
+                            [detailFn]="customerPicker().detail"
+                            [extraActionLabel]="'+ Créer « ' + row.extractedClientLabel + ' »'"
+                            placeholder="Client existant…"
+                            (itemSelected)="emitPatch(row.scanId, { customerSelection: $event?.id ?? '' })"
+                            (extraAction)="emitPatch(row.scanId, { customerSelection: createClientValue() })"
+                          />
+                        }
                       </td>
                       <td class="px-3 py-3">
                         <input
@@ -166,7 +182,7 @@ export interface InvoiceScanRowPatchEvent {
 })
 export class InvoiceScanReviewModalComponent {
   readonly pendingRows = input.required<InvoiceScanPendingRow[]>();
-  readonly customers = input.required<Customer[]>();
+  readonly customerPicker = input.required<CustomerPickerSource>();
   readonly batchPageCount = input.required<number>();
   readonly batchErrorDetails = input.required<InvoiceScanImportError[]>();
   readonly createClientValue = input.required<string>();
@@ -186,20 +202,8 @@ export class InvoiceScanReviewModalComponent {
     return (event.target as HTMLInputElement).value;
   }
 
-  selectValue(event: Event): string {
-    return (event.target as HTMLSelectElement).value;
-  }
-
   numberInput(event: Event): number {
     const v = parseFloat((event.target as HTMLInputElement).value);
     return Number.isFinite(v) ? v : 0;
-  }
-
-  customerOptionLabel(c: Customer): string {
-    if (c.companyName?.trim()) {
-      return c.companyName.trim();
-    }
-    const name = [c.firstName, c.lastName].filter(Boolean).join(' ').trim();
-    return name || c.email || c.id;
   }
 }

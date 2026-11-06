@@ -23,6 +23,24 @@ public interface InvoiceRepository extends JpaRepository<Invoice, UUID> {
 
     Page<Invoice> findByTenantIdAndWorkspaceIdOrderByIssueDateDesc(UUID tenantId, UUID workspaceId, Pageable pageable);
 
+    /**
+     * Liste filtrée : client optionnel, « ouvertes » = émises avec un reste à payer, recherche sur le numéro.
+     * Le tri vient du {@link Pageable}.
+     */
+    @Query("""
+            SELECT i FROM Invoice i
+            WHERE i.tenantId = :tenantId AND i.workspaceId = :workspaceId
+            AND (:customerId IS NULL OR i.customerId = :customerId)
+            AND (:openOnly = false OR (i.status IN ('ISSUED', 'PARTIALLY_PAID') AND i.amountPaid < i.totalTtc))
+            AND (:qPattern IS NULL OR LOWER(i.number) LIKE :qPattern)
+            """)
+    Page<Invoice> search(@Param("tenantId") UUID tenantId,
+                         @Param("workspaceId") UUID workspaceId,
+                         @Param("customerId") UUID customerId,
+                         @Param("openOnly") boolean openOnly,
+                         @Param("qPattern") String qPattern,
+                         Pageable pageable);
+
     @Query("""
             SELECT COALESCE(SUM(i.totalTtc), 0) FROM Invoice i
             WHERE i.tenantId = :tenantId
@@ -126,9 +144,6 @@ public interface InvoiceRepository extends JpaRepository<Invoice, UUID> {
 
     Optional<Invoice> findByTenantIdAndWorkspaceIdAndMerchantIgnoreCaseAndOrderNumberIgnoreCase(
             UUID tenantId, UUID workspaceId, String merchant, String orderNumber);
-
-    Optional<Invoice> findByTenantIdAndWorkspaceIdAndEtsyReceiptId(
-            UUID tenantId, UUID workspaceId, Long etsyReceiptId);
 
     @Query("""
             SELECT i FROM Invoice i

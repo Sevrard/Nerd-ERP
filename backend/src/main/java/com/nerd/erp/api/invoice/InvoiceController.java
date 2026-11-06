@@ -3,6 +3,7 @@ package com.nerd.erp.api.invoice;
 import com.nerd.erp.api.invoice.InvoiceResponse;
 import com.nerd.erp.application.invoice.InvoiceService;
 import com.nerd.erp.api.shared.PageResponse;
+import com.nerd.erp.infrastructure.security.core.RequireWriteAccess;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
@@ -30,8 +31,11 @@ public class InvoiceController {
     @GetMapping
     public PageResponse<InvoiceResponse> list(
             @RequestParam UUID workspaceId,
+            @RequestParam(required = false) UUID customerId,
+            @RequestParam(defaultValue = "false") boolean openOnly,
+            @RequestParam(required = false) String q,
             @PageableDefault(size = 20, sort = "issueDate", direction = Sort.Direction.DESC) Pageable pageable) {
-        return invoiceService.list(workspaceId, pageable);
+        return invoiceService.list(workspaceId, customerId, openOnly, q, pageable);
     }
 
     @GetMapping("/{id}")
@@ -41,6 +45,7 @@ public class InvoiceController {
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
+    @RequireWriteAccess
     public void delete(@PathVariable UUID id) {
         invoiceService.delete(id);
     }

@@ -1,6 +1,7 @@
 import { Component, effect, inject, output, signal } from '@angular/core';
 import { InvoiceScanApiService } from './invoice-scan-api.service';
 import { WorkspaceService } from '../../core/workspace/workspace.service';
+import { customerPickerSource } from '../customers/customer-picker.util';
 import { CustomersApiService } from '../customers/customers-api.service';
 import { MerchantsApiService } from '../merchants/merchants-api.service';
 import { Merchant } from '../../shared/models/merchant.model';
@@ -11,7 +12,6 @@ import {
   InvoiceScanPreview,
   scanCustomerLabel,
 } from '../../shared/models/invoice-scan.model';
-import { Customer } from '../../shared/models/customer.model';
 import { ErrorBannerComponent } from '../../shared/ui/error-banner.component';
 import { InvoiceScanReviewModalComponent } from './invoice-scan-review-modal.component';
 import { apiErrorMessage } from '../../shared/utils/api-error.util';
@@ -124,7 +124,7 @@ const CREATE_CLIENT_VALUE = '__create__';
     @if (step() === 'review-modal') {
       <app-invoice-scan-review-modal
         [pendingRows]="pendingRows()"
-        [customers]="customers()"
+        [customerPicker]="customerPicker"
         [batchPageCount]="batchPageCount()"
         [batchErrorDetails]="batchErrorDetails()"
         [createClientValue]="CREATE_CLIENT_VALUE"
@@ -149,7 +149,7 @@ export class InvoiceScanPanelComponent {
   readonly step = signal<Step>('idle');
   readonly error = signal<string | null>(null);
   readonly pendingRows = signal<InvoiceScanPendingRow[]>([]);
-  readonly customers = signal<Customer[]>([]);
+  readonly customerPicker = customerPickerSource(this.customersApi, this.workspaces);
   readonly merchants = signal<Merchant[]>([]);
   readonly selectedMerchantId = signal<string | null>(null);
 
@@ -178,8 +178,7 @@ export class InvoiceScanPanelComponent {
           const current = this.selectedMerchantId();
           const stillValid = current && list.some((m) => m.id === current);
           if (!stillValid) {
-            const etsy = list.find((m) => m.slug === 'etsy');
-            this.selectedMerchantId.set(etsy?.id ?? list[0]?.id ?? null);
+            this.selectedMerchantId.set(list[0]?.id ?? null);
           }
         },
         error: () => {
@@ -270,7 +269,6 @@ export class InvoiceScanPanelComponent {
           .map((p) => this.toPendingRow(p.pageNumber, p.preview));
 
         this.pendingRows.set(rows);
-        this.loadCustomers(workspaceId);
         this.step.set('review-modal');
       },
       error: (err) => {
@@ -316,6 +314,10 @@ export class InvoiceScanPanelComponent {
     }
 
     const createClient = row.customerSelection === CREATE_CLIENT_VALUE;
+    if (!createClient && !row.customerSelection) {
+      this.patchRow(scanId, { rowError: 'Choisissez un client existant ou créez-le' });
+      return;
+    }
     const duplicate = row.duplicateDetected;
 
     this.patchRow(scanId, { saving: true, rowError: null });
@@ -367,20 +369,12 @@ export class InvoiceScanPanelComponent {
     this.step.set('idle');
     this.error.set(null);
     this.pendingRows.set([]);
-    this.customers.set([]);
     this.batchPageCount.set(0);
     this.batchImported.set(0);
     this.batchPayments.set(0);
     this.batchAnalyzeErrors.set(0);
     this.batchSkipped.set(0);
     this.batchErrorDetails.set([]);
-  }
-
-  private loadCustomers(workspaceId: string): void {
-    this.customersApi.search(workspaceId, { page: 0, size: 500 }).subscribe({
-      next: (page) => this.customers.set(page.content),
-      error: () => this.customers.set([]),
-    });
   }
 
   private toPendingRow(pageNumber: number, preview: InvoiceScanPreview): InvoiceScanPendingRow {
