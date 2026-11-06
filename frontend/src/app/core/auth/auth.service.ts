@@ -1,8 +1,8 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
-import { tap } from 'rxjs';
+import { Observable, of, shareReplay, tap } from 'rxjs';
 import { ApiClient } from '../api/api-client.service';
-import { LoginRequest, LoginResponse, MeResponse, TenantRole } from '../../shared/models/auth.model';
+import { LoginRequest, LoginResponse, MeResponse, ModuleCode, TenantRole } from '../../shared/models/auth.model';
 
 const TOKEN_KEY = 'nerd-erp.token';
 const TENANT_SLUG_KEY = 'nerd-erp.tenant-slug';
@@ -20,14 +20,26 @@ export class AuthService {
 
   private readonly tokenSignal = signal<string | null>(this.readToken());
   private readonly profileSignal = signal<MeResponse | null>(null);
+  /** Profil complet (`/auth/me`) chargé au moins une fois pour la session courante. */
+  private readonly profileLoadedSignal = signal(false);
+  private profileRequest$: Observable<MeResponse> | null = null;
 
   readonly token = this.tokenSignal.asReadonly();
   readonly profile = this.profileSignal.asReadonly();
+  readonly profileLoaded = this.profileLoadedSignal.asReadonly();
   readonly isAuthenticated = computed(() => !!this.tokenSignal());
   readonly canAdminister = computed(() => {
     const role = this.profileSignal()?.role ?? this.readStoredRole();
     return isAdminRole(role);
   });
+  readonly isPlatformAdmin = computed(() => this.profileSignal()?.platformAdmin === true);
+  readonly enabledModules = computed<ReadonlySet<ModuleCode>>(
+    () => new Set(this.profileSignal()?.modules ?? []),
+  );
+
+  hasModule(code: ModuleCode): boolean {
+    return this.enabledModules().has(code);
+  }
 
   login(payload: LoginRequest) {
     return this.api.post<LoginResponse>('/auth/login', payload).pipe(
@@ -36,11 +48,15 @@ export class AuthService {
         localStorage.setItem(TENANT_SLUG_KEY, payload.tenantSlug);
         localStorage.setItem(ROLE_KEY, res.role);
         this.tokenSignal.set(res.accessToken);
+        this.profileLoadedSignal.set(false);
+        this.profileRequest$ = null;
         this.profileSignal.set({
           userId: res.userId,
           tenantId: res.tenantId,
           email: res.email,
           role: res.role,
+          platformAdmin: res.platformAdmin,
+          modules: [],
           workspaces: [],
         });
       }),
@@ -52,8 +68,21 @@ export class AuthService {
       tap((me) => {
         localStorage.setItem(ROLE_KEY, me.role);
         this.profileSignal.set(me);
+        this.profileLoadedSignal.set(true);
       }),
     );
+  }
+
+  /** Profil chargé si nécessaire (une seule requête partagée), pour les guards de route. */
+  ensureProfile(): Observable<MeResponse | null> {
+    const current = this.profileSignal();
+    if (this.profileLoadedSignal() && current) {
+      return of(current);
+    }
+    if (!this.profileRequest$) {
+      this.profileRequest$ = this.loadProfile().pipe(shareReplay({ bufferSize: 1, refCount: false }));
+    }
+    return this.profileRequest$;
   }
 
   logout(): void {
@@ -61,6 +90,8 @@ export class AuthService {
     localStorage.removeItem(ROLE_KEY);
     this.tokenSignal.set(null);
     this.profileSignal.set(null);
+    this.profileLoadedSignal.set(false);
+    this.profileRequest$ = null;
     void this.router.navigate(['/login']);
   }
 

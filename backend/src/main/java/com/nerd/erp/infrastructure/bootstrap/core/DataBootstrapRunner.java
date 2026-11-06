@@ -4,9 +4,12 @@ import com.nerd.erp.domain.organization.Organization;
 import com.nerd.erp.infrastructure.persistence.organization.OrganizationRepository;
 import com.nerd.erp.domain.tenancy.TenantRole;
 import com.nerd.erp.infrastructure.config.core.BootstrapProperties;
+import com.nerd.erp.domain.module.ModuleCode;
+import com.nerd.erp.domain.module.TenantModule;
 import com.nerd.erp.domain.tenancy.AppUser;
 import com.nerd.erp.domain.tenancy.Tenant;
 import com.nerd.erp.domain.tenancy.TenantMembership;
+import com.nerd.erp.infrastructure.persistence.module.TenantModuleRepository;
 import com.nerd.erp.infrastructure.persistence.tenancy.AppUserRepository;
 import com.nerd.erp.infrastructure.persistence.tenancy.TenantMembershipRepository;
 import com.nerd.erp.infrastructure.persistence.tenancy.TenantRepository;
@@ -18,6 +21,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.UUID;
 
 @Component
@@ -29,6 +33,7 @@ public class DataBootstrapRunner implements ApplicationRunner {
     private final TenantMembershipRepository membershipRepository;
     private final OrganizationRepository organizationRepository;
     private final WorkspaceRepository workspaceRepository;
+    private final TenantModuleRepository tenantModuleRepository;
     private final PasswordEncoder passwordEncoder;
 
     public DataBootstrapRunner(BootstrapProperties bootstrapProperties,
@@ -37,6 +42,7 @@ public class DataBootstrapRunner implements ApplicationRunner {
                                TenantMembershipRepository membershipRepository,
                                OrganizationRepository organizationRepository,
                                WorkspaceRepository workspaceRepository,
+                               TenantModuleRepository tenantModuleRepository,
                                PasswordEncoder passwordEncoder) {
         this.bootstrapProperties = bootstrapProperties;
         this.tenantRepository = tenantRepository;
@@ -44,13 +50,18 @@ public class DataBootstrapRunner implements ApplicationRunner {
         this.membershipRepository = membershipRepository;
         this.organizationRepository = organizationRepository;
         this.workspaceRepository = workspaceRepository;
+        this.tenantModuleRepository = tenantModuleRepository;
         this.passwordEncoder = passwordEncoder;
     }
 
     @Override
     @Transactional
     public void run(ApplicationArguments args) {
-        if (!bootstrapProperties.enabled() || tenantRepository.existsBySlug(bootstrapProperties.tenantSlug())) {
+        if (!bootstrapProperties.enabled()) {
+            return;
+        }
+        if (tenantRepository.existsBySlug(bootstrapProperties.tenantSlug())) {
+            ensurePlatformAdmin();
             return;
         }
         Tenant tenant = new Tenant();
@@ -62,6 +73,7 @@ public class DataBootstrapRunner implements ApplicationRunner {
         admin.setEmail(bootstrapProperties.adminEmail());
         admin.setDisplayName("Administrator");
         admin.setPasswordHash(passwordEncoder.encode(bootstrapProperties.adminPassword()));
+        admin.setPlatformAdmin(true);
         admin = appUserRepository.save(admin);
 
         TenantMembership membership = new TenantMembership();
@@ -81,6 +93,25 @@ public class DataBootstrapRunner implements ApplicationRunner {
         Workspace nerdForge = workspace("Nerd-Forge", "nerd-forge", tenant.getId(), org.getId());
         workspaceRepository.save(nerdGroup);
         workspaceRepository.save(nerdForge);
+
+        for (ModuleCode code : ModuleCode.values()) {
+            TenantModule module = new TenantModule();
+            module.setTenantId(tenant.getId());
+            module.setModuleCode(code);
+            module.setEnabled(true);
+            module.setActivatedAt(Instant.now());
+            tenantModuleRepository.save(module);
+        }
+    }
+
+    /** Base déjà initialisée : l'e-mail d'administration configuré est promu administrateur plateforme. */
+    private void ensurePlatformAdmin() {
+        appUserRepository.findByEmailIgnoreCase(bootstrapProperties.adminEmail())
+                .filter(user -> !user.isPlatformAdmin())
+                .ifPresent(user -> {
+                    user.setPlatformAdmin(true);
+                    appUserRepository.save(user);
+                });
     }
 
     private Workspace workspace(String name, String slug, UUID tenantId, UUID orgId) {

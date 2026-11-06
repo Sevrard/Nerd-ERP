@@ -1,6 +1,8 @@
 package com.nerd.erp.api.auth;
 
 import com.nerd.erp.application.auth.AuthService;
+import com.nerd.erp.application.module.ModuleAccessService;
+import com.nerd.erp.domain.module.ModuleCode;
 import com.nerd.erp.infrastructure.security.core.AuthenticatedUser;
 import com.nerd.erp.infrastructure.security.core.SecurityContextHelper;
 import com.nerd.erp.api.workspace.WorkspaceResponse;
@@ -21,10 +23,13 @@ public class AuthController {
 
     private final AuthService authService;
     private final WorkspaceService workspaceService;
+    private final ModuleAccessService moduleAccessService;
 
-    public AuthController(AuthService authService, WorkspaceService workspaceService) {
+    public AuthController(AuthService authService, WorkspaceService workspaceService,
+                          ModuleAccessService moduleAccessService) {
         this.authService = authService;
         this.workspaceService = workspaceService;
+        this.moduleAccessService = moduleAccessService;
     }
 
     @PostMapping("/login")
@@ -36,11 +41,14 @@ public class AuthController {
     public Map<String, Object> me() {
         AuthenticatedUser user = SecurityContextHelper.requireUser();
         List<WorkspaceResponse> workspaces = workspaceService.listActiveForCurrentTenant();
+        List<ModuleCode> modules = moduleAccessService.enabledModules(user.tenantId()).stream().sorted().toList();
         return Map.of(
                 "userId", user.userId(),
                 "tenantId", user.tenantId(),
                 "email", user.email(),
                 "role", user.role(),
+                "platformAdmin", user.platformAdmin(),
+                "modules", modules,
                 "workspaces", workspaces);
     }
 }

@@ -1,5 +1,8 @@
 export type TenantRole = 'OWNER' | 'ADMIN' | 'USER' | 'READONLY';
 
+/** Modules optionnels activables par tenant (miroir de `ModuleCode` côté backend). */
+export type ModuleCode = 'MAINTENANCE' | 'INVOICE_SCAN';
+
 export interface LoginRequest {
   email: string;
   password: string;
@@ -12,6 +15,7 @@ export interface LoginResponse {
   tenantId: string;
   role: TenantRole;
   email: string;
+  platformAdmin: boolean;
 }
 
 export interface MeResponse {
@@ -19,5 +23,7 @@ export interface MeResponse {
   tenantId: string;
   email: string;
   role: TenantRole;
+  platformAdmin: boolean;
+  modules: ModuleCode[];
   workspaces: import('./workspace.model').Workspace[];
 }

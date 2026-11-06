@@ -9,6 +9,7 @@ public record LoginResponse(
         UUID userId,
         UUID tenantId,
         TenantRole role,
-        String email
+        String email,
+        boolean platformAdmin
 ) {
 }

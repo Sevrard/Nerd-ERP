@@ -32,4 +32,8 @@ public class AppUser extends AuditableEntity {
 
     @Column(nullable = false)
     private boolean enabled = true;
+
+    /** Administrateur de la plateforme (éditeur) : accès à /api/v1/admin/** quel que soit le tenant. */
+    @Column(name = "platform_admin", nullable = false)
+    private boolean platformAdmin = false;
 }

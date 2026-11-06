@@ -26,7 +26,7 @@ export class MainLayoutComponent implements OnInit {
   private readonly workspaces = inject(WorkspaceService);
 
   ngOnInit(): void {
-    this.auth.loadProfile().subscribe();
+    this.auth.ensureProfile().subscribe();
     this.workspaces.loadWorkspaces().subscribe();
   }
 }

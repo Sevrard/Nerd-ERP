@@ -1,7 +1,7 @@
 import { DatePipe } from '@angular/common';
-import { Component, computed, effect, inject, signal } from '@angular/core';
+import { Component, effect, inject, signal } from '@angular/core';
 import { WorkspaceService } from '../../core/workspace/workspace.service';
-import { workspaceAllowsInvoicePdfImport, workspaceShopSyncLabel } from '../../core/workspace/workspace-shop-sync.config';
+import { ModuleService } from '../../core/modules/module.service';
 import { Invoice, invoiceCustomerDisplayName } from '../../shared/models/invoice.model';
 import { formatMoney } from '../../shared/utils/money.util';
 import { EmptyStateComponent } from '../../shared/ui/empty-state.component';
@@ -9,9 +9,11 @@ import { ErrorBannerComponent } from '../../shared/ui/error-banner.component';
 import { LoadingStateComponent } from '../../shared/ui/loading-state.component';
 import { IconActionComponent } from '../../shared/ui/icon-action.component';
 import { LucideIconComponent } from '../../shared/ui/lucide-icon.component';
+import { PaginatorComponent } from '../../shared/ui/paginator.component';
 import { InvoicesApiService } from './invoices-api.service';
 import { InvoiceScanPanelComponent } from './invoice-scan-panel.component';
 import { apiErrorMessage } from '../../shared/utils/api-error.util';
+import { PageState } from '../../shared/utils/page-state';
 
 @Component({
   selector: 'app-invoices-list-page',
@@ -24,25 +26,20 @@ import { apiErrorMessage } from '../../shared/utils/api-error.util';
     IconActionComponent,
     LucideIconComponent,
     InvoiceScanPanelComponent,
+    PaginatorComponent,
   ],
   template: `
     <div class="space-y-6">
       <h1 class="text-2xl font-bold text-white">Factures</h1>
 
-      @if (pdfImportEnabled()) {
+      @if (modules.isEnabled('INVOICE_SCAN')) {
         <app-invoice-scan-panel (invoicesChanged)="reload()" />
-      } @else if (shopSyncLabel()) {
-        <p class="rounded-xl border border-slate-800 bg-slate-900/60 px-4 py-3 text-sm text-slate-400">
-          Import PDF désactivé : les factures de ce workspace proviennent de la synchronisation
-          <span class="font-medium text-orange-300">{{ shopSyncLabel() }}</span>
-          (dashboard).
-        </p>
       }
 
       @if (error()) {
         <app-error-banner [message]="error()!" />
       }
-      @if (loading()) {
+      @if (loading() && !items().length) {
         <app-loading-state />
       } @else if (!items().length) {
         <app-empty-state title="Aucune facture." />
@@ -156,7 +153,7 @@ import { apiErrorMessage } from '../../shared/utils/api-error.util';
                               <thead class="bg-slate-900/90 text-xs uppercase text-slate-500">
                                 <tr>
                                   <th class="px-3 py-2">Ligne</th>
-                                  <th class="px-3 py-2">Produit / Etsy</th>
+                                  <th class="px-3 py-2">Produit</th>
                                   <th class="px-3 py-2">Qté</th>
                                   <th class="px-3 py-2">TTC</th>
                                 </tr>
@@ -173,14 +170,8 @@ import { apiErrorMessage } from '../../shared/utils/api-error.util';
                                           variant="brand"
                                           [link]="['/products', line.productId, 'edit']"
                                         />
-                                      } @else if (line.etsyListingId) {
-                                        <span class="text-amber-200/90">Listing Etsy #{{ line.etsyListingId }}</span>
-                                        <span class="text-slate-500"> · non lié au catalogue</span>
                                       } @else {
                                         <span class="text-slate-500">—</span>
-                                      }
-                                      @if (line.etsyTransactionId) {
-                                        <span class="mt-0.5 block text-slate-600">Transaction {{ line.etsyTransactionId }}</span>
                                       }
                                     </td>
                                     <td class="px-3 py-2 text-slate-400">{{ line.quantity }}</td>
@@ -216,6 +207,12 @@ import { apiErrorMessage } from '../../shared/utils/api-error.util';
               }
             </tbody>
           </table>
+          <app-paginator
+            [meta]="page.meta()"
+            [disabled]="loading()"
+            (pageChange)="onPageChange($event)"
+            (pageSizeChange)="onPageSizeChange($event)"
+          />
         </div>
       }
     </div>
@@ -224,28 +221,40 @@ import { apiErrorMessage } from '../../shared/utils/api-error.util';
 export class InvoicesListPageComponent {
   private readonly api = inject(InvoicesApiService);
   private readonly workspaces = inject(WorkspaceService);
+  readonly modules = inject(ModuleService);
 
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
   readonly items = signal<Invoice[]>([]);
+  readonly page = new PageState();
   readonly deletingId = signal<string | null>(null);
   readonly downloadingId = signal<string | null>(null);
   readonly expandedId = signal<string | null>(null);
-
-  readonly shopSyncLabel = computed(() => workspaceShopSyncLabel(this.workspaces.selectedWorkspace()?.slug));
-  readonly pdfImportEnabled = computed(() => workspaceAllowsInvoicePdfImport(this.workspaces.selectedWorkspace()?.slug));
 
   readonly customerName = invoiceCustomerDisplayName;
 
   constructor() {
     effect(() => {
       this.workspaces.generation();
+      this.page.reset();
       this.reload();
     });
   }
 
   money(v: number): string {
     return formatMoney(v);
+  }
+
+  onPageChange(index: number): void {
+    this.page.goTo(index);
+    this.expandedId.set(null);
+    this.reload();
+  }
+
+  onPageSizeChange(size: number): void {
+    this.page.setSize(size);
+    this.expandedId.set(null);
+    this.reload();
   }
 
   isExpanded(id: string): boolean {
@@ -260,9 +269,6 @@ export class InvoicesListPageComponent {
     const key = merchant?.trim().toLowerCase().replace(/\s+/g, '-');
     if (!key) {
       return null;
-    }
-    if (key === 'etsy') {
-      return { src: '/branding/etsy-icon.png', alt: 'Etsy' };
     }
     if (key === 'nerd-forge') {
       return { src: '/branding/nerd-forge-logo.png', alt: 'Nerd-Forge' };
@@ -310,6 +316,7 @@ export class InvoicesListPageComponent {
         if (this.expandedId() === inv.id) {
           this.expandedId.set(null);
         }
+        this.page.adjustAfterRemoval();
         this.reload();
       },
       error: (err) => {
@@ -326,12 +333,13 @@ export class InvoicesListPageComponent {
     }
     const gen = this.workspaces.generation();
     this.loading.set(true);
-    this.api.list(workspaceId).subscribe({
+    this.api.list(workspaceId, this.page.query()).subscribe({
       next: (page) => {
         if (this.workspaces.isStale(gen)) {
           return;
         }
         this.items.set(page.content);
+        this.page.apply(page);
         this.loading.set(false);
       },
       error: (err) => {

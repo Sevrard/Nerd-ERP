@@ -1,9 +1,12 @@
 package com.nerd.erp.api.maintenance;
 
+import com.nerd.erp.domain.module.ModuleCode;
+import com.nerd.erp.infrastructure.security.core.RequireModule;
 import com.nerd.erp.api.maintenance.MaintenanceContractRequest;
 import com.nerd.erp.api.maintenance.MaintenanceContractResponse;
 import com.nerd.erp.application.maintenance.MaintenanceContractService;
 import com.nerd.erp.api.shared.PageResponse;
+import com.nerd.erp.infrastructure.security.core.RequireWriteAccess;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -21,6 +24,7 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/maintenance-contracts")
+@RequireModule(ModuleCode.MAINTENANCE)
 public class MaintenanceContractController {
 
     private final MaintenanceContractService service;
@@ -37,11 +41,13 @@ public class MaintenanceContractController {
     }
 
     @PostMapping
+    @RequireWriteAccess
     public MaintenanceContractResponse create(@Valid @RequestBody MaintenanceContractRequest request) {
         return service.create(request);
     }
 
     @PutMapping("/{id}")
+    @RequireWriteAccess
     public MaintenanceContractResponse update(@PathVariable UUID id,
                                               @Valid @RequestBody MaintenanceContractRequest request) {
         return service.update(id, request);

@@ -32,6 +32,7 @@ public class JwtService {
                 .claim("tenantId", user.tenantId().toString())
                 .claim("role", user.role().name())
                 .claim("email", user.email())
+                .claim("platformAdmin", user.platformAdmin())
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(exp))
                 .signWith(key)
@@ -48,6 +49,7 @@ public class JwtService {
                 UUID.fromString(claims.getSubject()),
                 UUID.fromString(claims.get("tenantId", String.class)),
                 TenantRole.valueOf(claims.get("role", String.class)),
-                claims.get("email", String.class));
+                claims.get("email", String.class),
+                Boolean.TRUE.equals(claims.get("platformAdmin", Boolean.class)));
     }
 }

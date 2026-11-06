@@ -133,7 +133,7 @@ import { apiErrorMessage } from '../../shared/utils/api-error.util';
             Cliquez sur l’œil pour afficher ou masquer une rubrique.
           </p>
           <nav class="space-y-1" aria-label="Personnalisation des modules">
-            @for (item of navModules.items; track item.path) {
+            @for (item of navModules.items(); track item.path) {
               <div
                 class="flex items-center gap-2 rounded-lg px-3 py-2 text-sm"
                 [class.bg-slate-900/50]="!navModules.isVisible(item.path)"
@@ -174,6 +174,21 @@ import { apiErrorMessage } from '../../shared/utils/api-error.util';
                 {{ item.label }}
               </a>
             }
+          </nav>
+        }
+
+        @if (auth.isPlatformAdmin()) {
+          <p class="mb-2 mt-6 px-3 text-xs font-semibold uppercase tracking-wider text-slate-500">Éditeur</p>
+          <nav class="space-y-1" aria-label="Administration plateforme">
+            <a
+              routerLink="/admin/tenants"
+              routerLinkActive="bg-slate-800/60 text-white"
+              class="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-400 transition-colors hover:bg-slate-800/50 hover:text-white"
+              (click)="layout.closeMobileSidebar()"
+            >
+              <app-lucide-icon name="settings" [size]="16" />
+              Comptes clients
+            </a>
           </nav>
         }
       </div>
@@ -343,6 +358,37 @@ import { apiErrorMessage } from '../../shared/utils/api-error.util';
             </label>
           </div>
 
+          <p class="mt-4 text-xs font-semibold uppercase tracking-wider text-cyan-500/90">Coordonnées bancaires</p>
+          <p class="mt-1 text-[11px] text-slate-500">Affichées dans les conditions de règlement des devis et factures.</p>
+          <div class="mt-2 grid gap-3 sm:grid-cols-3">
+            <label class="block text-sm text-slate-300 sm:col-span-2">
+              IBAN
+              <input
+                type="text"
+                maxlength="42"
+                placeholder="FR76 1234 5678 9012 3456 7890 123"
+                autocomplete="off"
+                class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 font-mono text-sm uppercase text-white"
+                [(ngModel)]="editForm.iban"
+                name="editIban"
+                [disabled]="workspaceBusy()"
+              />
+            </label>
+            <label class="block text-sm text-slate-300">
+              BIC / SWIFT
+              <input
+                type="text"
+                maxlength="11"
+                placeholder="NERDFRPPXXX"
+                autocomplete="off"
+                class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 font-mono text-sm uppercase text-white"
+                [(ngModel)]="editForm.bic"
+                name="editBic"
+                [disabled]="workspaceBusy()"
+              />
+            </label>
+          </div>
+
           <p class="mt-4 text-xs font-semibold uppercase tracking-wider text-cyan-500/90">Numérotation documents</p>
           <div class="mt-2 grid gap-3 sm:grid-cols-3">
             <label class="block text-sm text-slate-300">
@@ -501,6 +547,8 @@ export class SidebarComponent {
       websiteUrl: '',
       siren: '',
       vatNumber: '',
+      iban: '',
+      bic: '',
       currencyCode: 'EUR',
       invoicePrefix: 'FAC',
       quotationPrefix: 'DEV',
@@ -533,6 +581,8 @@ export class SidebarComponent {
       websiteUrl: ws.websiteUrl ?? '',
       siren: ws.siren ?? '',
       vatNumber: ws.vatNumber ?? '',
+      iban: ws.iban ?? '',
+      bic: ws.bic ?? '',
       currencyCode: ws.currencyCode || 'EUR',
       invoicePrefix: ws.invoicePrefix || 'FAC',
       quotationPrefix: ws.quotationPrefix || 'DEV',
@@ -566,6 +616,8 @@ export class SidebarComponent {
       websiteUrl: this.nullIfBlank(this.editForm.websiteUrl),
       siren: this.nullIfBlank(this.editForm.siren),
       vatNumber: this.nullIfBlank(this.editForm.vatNumber),
+      iban: this.nullIfBlank(this.editForm.iban?.replace(/\s+/g, '').toUpperCase()),
+      bic: this.nullIfBlank(this.editForm.bic?.replace(/\s+/g, '').toUpperCase()),
       currencyCode: this.editForm.currencyCode.trim().toUpperCase(),
       invoicePrefix: this.editForm.invoicePrefix.trim(),
       quotationPrefix: this.editForm.quotationPrefix.trim(),

@@ -1,7 +1,10 @@
 package com.nerd.erp.api.invoicescan;
 
+import com.nerd.erp.domain.module.ModuleCode;
+import com.nerd.erp.infrastructure.security.core.RequireModule;
 import com.nerd.erp.api.invoice.InvoiceResponse;
 import com.nerd.erp.application.invoicescan.InvoiceScanService;
+import com.nerd.erp.infrastructure.security.core.RequireWriteAccess;
 import jakarta.validation.Valid;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -16,6 +19,7 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/invoice-scan")
+@RequireModule(ModuleCode.INVOICE_SCAN)
 public class InvoiceScanController {
 
     private final InvoiceScanService invoiceScanService;
@@ -25,6 +29,7 @@ public class InvoiceScanController {
     }
 
     @PostMapping(value = "/analyze", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @RequireWriteAccess
     public InvoiceScanBatchPreviewResponse analyze(
             @RequestParam UUID workspaceId,
             @RequestParam(required = false) UUID merchantId,
@@ -33,6 +38,7 @@ public class InvoiceScanController {
     }
 
     @PostMapping("/commit")
+    @RequireWriteAccess
     public InvoiceResponse commit(@Valid @RequestBody InvoiceScanCommitRequest request) {
         return invoiceScanService.commit(request);
     }

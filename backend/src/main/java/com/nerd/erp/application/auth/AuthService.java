@@ -51,8 +51,9 @@ public class AuthService {
         TenantMembership membership = membershipRepository.findByTenantIdAndUserId(tenant.getId(), user.getId())
                 .orElseThrow(() -> new ApiException(HttpStatus.FORBIDDEN, "No access to tenant"));
         AuthenticatedUser authUser = new AuthenticatedUser(user.getId(), tenant.getId(), membership.getRole(),
-                user.getEmail());
+                user.getEmail(), user.isPlatformAdmin());
         String token = jwtService.generateToken(authUser);
-        return new LoginResponse(token, user.getId(), tenant.getId(), membership.getRole(), user.getEmail());
+        return new LoginResponse(token, user.getId(), tenant.getId(), membership.getRole(), user.getEmail(),
+                user.isPlatformAdmin());
     }
 }
