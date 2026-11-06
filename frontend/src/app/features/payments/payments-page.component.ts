@@ -33,9 +33,9 @@ import { apiErrorMessage } from '../../shared/utils/api-error.util';
   ],
   template: `
     <div class="space-y-8">
-      <h1 class="text-2xl font-bold text-white">Paiements</h1>
+      <h1 class="text-xl font-bold text-white sm:text-2xl">Paiements</h1>
 
-      <section class="rounded-xl border border-slate-800 bg-slate-900/50 p-6">
+      <section class="rounded-xl border border-slate-800 bg-slate-900/50 p-4 sm:p-6">
         <h2 class="mb-4 text-lg font-semibold text-white">Enregistrer un paiement</h2>
         @if (formError()) {
           <app-error-banner class="mb-4 block" [message]="formError()!" />
@@ -127,7 +127,18 @@ import { apiErrorMessage } from '../../shared/utils/api-error.util';
           <app-empty-state title="Aucun paiement." />
         } @else {
           <div class="overflow-hidden rounded-xl border border-slate-800">
-            <table class="min-w-full divide-y divide-slate-800 text-sm">
+            <ul class="divide-y divide-slate-800 md:hidden">
+              @for (p of payments(); track p.id) {
+                <li class="flex items-center justify-between gap-3 px-3 py-3">
+                  <div class="min-w-0">
+                    <p class="text-sm font-semibold text-white">{{ money(p.amount) }}</p>
+                    <p class="mt-0.5 text-xs text-slate-400">{{ p.paymentDate | date: 'dd/MM/yyyy' }} · {{ methodLabel(p.method) }}</p>
+                  </div>
+                  <p class="shrink-0 text-xs text-slate-500">{{ p.allocations.length }} facture(s)</p>
+                </li>
+              }
+            </ul>
+            <table class="hidden min-w-full divide-y divide-slate-800 text-sm md:table">
               <thead class="bg-slate-900/80 text-left text-xs uppercase text-slate-500">
                 <tr>
                   <th class="px-4 py-3">Date</th>
@@ -141,7 +152,7 @@ import { apiErrorMessage } from '../../shared/utils/api-error.util';
                   <tr>
                     <td class="px-4 py-3 text-slate-300">{{ p.paymentDate | date: 'shortDate' }}</td>
                     <td class="px-4 py-3 text-white">{{ money(p.amount) }}</td>
-                    <td class="px-4 py-3 text-slate-400">{{ p.method }}</td>
+                    <td class="px-4 py-3 text-slate-400">{{ methodLabel(p.method) }}</td>
                     <td class="px-4 py-3 text-slate-400">{{ p.allocations.length }} facture(s)</td>
                   </tr>
                 }
@@ -232,6 +243,21 @@ export class PaymentsPageComponent {
 
   money(v: number): string {
     return formatMoney(v);
+  }
+
+  methodLabel(method: PaymentMethod): string {
+    switch (method) {
+      case 'TRANSFER':
+        return 'Virement';
+      case 'CARD':
+        return 'Carte';
+      case 'CHECK':
+        return 'Chèque';
+      case 'CASH':
+        return 'Espèces';
+      default:
+        return 'Autre';
+    }
   }
 
   addAllocation(): void {

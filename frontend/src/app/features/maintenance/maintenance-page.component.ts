@@ -127,7 +127,7 @@ import { apiErrorMessage } from '../../shared/utils/api-error.util';
         } @else if (!contracts().length) {
           <app-empty-state title="Aucun contrat de maintenance." />
         } @else {
-          <div class="overflow-hidden rounded-xl border border-slate-800">
+          <div class="overflow-x-auto rounded-xl border border-slate-800">
             <table class="min-w-full divide-y divide-slate-800 text-sm">
               <thead class="bg-slate-900/80 text-left text-xs uppercase text-slate-500">
                 <tr>

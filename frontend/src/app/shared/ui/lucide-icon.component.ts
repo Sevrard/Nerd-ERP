@@ -46,6 +46,11 @@ import {
   Wallet,
   X,
   Zap,
+  House,
+  Menu,
+  Receipt,
+  CircleHelp,
+  ChevronLeft,
 } from 'lucide';
 
 export const LUCIDE_ICON_MAP = {
@@ -94,6 +99,11 @@ export const LUCIDE_ICON_MAP = {
   filter: Filter,
   zap: Zap,
   palette: Palette,
+  house: House,
+  menu: Menu,
+  receipt: Receipt,
+  'circle-help': CircleHelp,
+  'chevron-left': ChevronLeft,
 } as const;
 
 export type LucideIconName = keyof typeof LUCIDE_ICON_MAP;

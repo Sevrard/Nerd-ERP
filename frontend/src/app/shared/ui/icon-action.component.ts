@@ -46,8 +46,9 @@ export class IconActionComponent {
   }
 
   classes(): string {
+    // 40 px sur écran tactile (recommandation ≥ 44 px approchée), 32 px au bureau.
     const base =
-      'inline-flex size-8 items-center justify-center rounded-lg border transition focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/50 disabled:pointer-events-none disabled:opacity-40';
+      'inline-flex size-10 shrink-0 items-center justify-center rounded-lg border transition focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/50 active:bg-slate-800 disabled:pointer-events-none disabled:opacity-40 md:size-8';
     switch (this.variant()) {
       case 'brand':
         return `${base} border-slate-700/80 text-brand-400 hover:border-slate-600 hover:bg-slate-800 hover:text-brand-300`;

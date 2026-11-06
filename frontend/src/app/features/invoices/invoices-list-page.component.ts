@@ -1,8 +1,10 @@
 import { DatePipe } from '@angular/common';
 import { Component, effect, inject, signal } from '@angular/core';
+import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { WorkspaceService } from '../../core/workspace/workspace.service';
 import { ModuleService } from '../../core/modules/module.service';
-import { Invoice, invoiceCustomerDisplayName } from '../../shared/models/invoice.model';
+import { INVOICE_STATUS_LABELS, Invoice, invoiceCustomerDisplayName } from '../../shared/models/invoice.model';
 import { formatMoney } from '../../shared/utils/money.util';
 import { EmptyStateComponent } from '../../shared/ui/empty-state.component';
 import { ErrorBannerComponent } from '../../shared/ui/error-banner.component';
@@ -15,11 +17,21 @@ import { InvoiceScanPanelComponent } from './invoice-scan-panel.component';
 import { apiErrorMessage } from '../../shared/utils/api-error.util';
 import { PageState } from '../../shared/utils/page-state';
 
+function today(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function firstDayOfYear(): string {
+  return `${new Date().getFullYear()}-01-01`;
+}
+
 @Component({
   selector: 'app-invoices-list-page',
   standalone: true,
   imports: [
     DatePipe,
+    FormsModule,
+    RouterLink,
     LoadingStateComponent,
     EmptyStateComponent,
     ErrorBannerComponent,
@@ -30,7 +42,44 @@ import { PageState } from '../../shared/utils/page-state';
   ],
   template: `
     <div class="space-y-6">
-      <h1 class="text-2xl font-bold text-white">Factures</h1>
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <h1 class="text-xl font-bold text-white sm:text-2xl">Factures</h1>
+        <form class="hidden flex-wrap items-end gap-2 sm:flex" (ngSubmit)="exportCsv()">
+          <label class="block text-xs text-slate-400">
+            Du
+            <input
+              type="date"
+              class="mt-1 block rounded-lg border border-slate-700 bg-slate-900 px-2 py-1.5 text-sm text-white"
+              [(ngModel)]="exportFrom"
+              name="exportFrom"
+              required
+            />
+          </label>
+          <label class="block text-xs text-slate-400">
+            au
+            <input
+              type="date"
+              class="mt-1 block rounded-lg border border-slate-700 bg-slate-900 px-2 py-1.5 text-sm text-white"
+              [(ngModel)]="exportTo"
+              name="exportTo"
+              required
+            />
+          </label>
+          <button
+            type="submit"
+            class="inline-flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm font-medium text-slate-100 hover:bg-slate-700 disabled:opacity-50"
+            title="Export comptable CSV (factures et avoirs émis sur la période)"
+            [disabled]="exporting() || !exportFrom || !exportTo"
+          >
+            @if (exporting()) {
+              <app-lucide-icon name="loader" [size]="16" [spin]="true" />
+            } @else {
+              <app-lucide-icon name="download" [size]="16" />
+            }
+            Export CSV
+          </button>
+        </form>
+      </div>
 
       @if (modules.isEnabled('INVOICE_SCAN')) {
         <app-invoice-scan-panel (invoicesChanged)="reload()" />
@@ -45,7 +94,42 @@ import { PageState } from '../../shared/utils/page-state';
         <app-empty-state title="Aucune facture." />
       } @else {
         <div class="overflow-hidden rounded-xl border border-slate-800">
-          <table class="min-w-full divide-y divide-slate-800 text-sm">
+          <!-- Smartphone : cartes (numéro, client, statut, reste dû) + PDF. -->
+          <ul class="divide-y divide-slate-800 md:hidden">
+            @for (inv of items(); track inv.id) {
+              <li class="flex items-center gap-2 px-3 py-3">
+                <a [routerLink]="['/invoices', inv.id]" class="min-w-0 flex-1 active:opacity-70">
+                  <div class="flex items-center gap-2">
+                    <p class="truncate text-sm font-semibold text-white">{{ inv.number }}</p>
+                    @if (inv.invoiceType === 'CREDIT_NOTE') {
+                      <span class="rounded-full border border-violet-500/30 bg-violet-500/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-violet-300">Avoir</span>
+                    } @else if (inv.invoiceType === 'DEPOSIT') {
+                      <span class="rounded-full border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-amber-300">Acompte</span>
+                    }
+                  </div>
+                  <p class="mt-0.5 truncate text-xs text-slate-400">{{ customerName(inv) }}</p>
+                  <p class="mt-0.5 text-[11px] text-slate-500">
+                    {{ statusLabel(inv) }} · échéance {{ inv.dueDate | date: 'dd/MM/yyyy' }}
+                  </p>
+                </a>
+                <div class="shrink-0 text-right">
+                  <p class="text-sm font-semibold tabular-nums text-slate-100">{{ money(inv.totalTtc) }}</p>
+                  @if (inv.totalTtc - inv.amountPaid > 0.004 && inv.invoiceType !== 'CREDIT_NOTE') {
+                    <p class="text-[11px] tabular-nums text-amber-400">reste {{ money(inv.totalTtc - inv.amountPaid) }}</p>
+                  } @else {
+                    <p class="text-[11px] text-emerald-400">soldée</p>
+                  }
+                </div>
+                <app-icon-action
+                  icon="download"
+                  label="Télécharger le PDF"
+                  [loading]="downloadingId() === inv.id"
+                  (action)="downloadPdf(inv)"
+                />
+              </li>
+            }
+          </ul>
+          <table class="hidden min-w-full divide-y divide-slate-800 text-sm md:table">
             <thead class="bg-slate-900/80 text-left text-xs uppercase text-slate-500">
               <tr>
                 <th class="w-10 px-2 py-3"></th>
@@ -75,7 +159,18 @@ import { PageState } from '../../shared/utils/page-state';
                       </span>
                     </button>
                   </td>
-                  <td class="px-4 py-3 font-medium text-white">{{ inv.number }}</td>
+                  <td class="px-4 py-3 font-medium text-white">
+                    {{ inv.number }}
+                    @if (inv.invoiceType === 'CREDIT_NOTE') {
+                      <span class="ml-1 rounded-full border border-violet-500/30 bg-violet-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase text-violet-300">
+                        Avoir
+                      </span>
+                    } @else if (inv.invoiceType === 'DEPOSIT') {
+                      <span class="ml-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase text-amber-300">
+                        Acompte
+                      </span>
+                    }
+                  </td>
                   <td class="px-4 py-3 text-slate-300">{{ customerName(inv) }}</td>
                   <td class="px-4 py-3">
                     @if (merchantLogo(inv.merchant); as logo) {
@@ -94,7 +189,7 @@ import { PageState } from '../../shared/utils/page-state';
                     }
                   </td>
                   <td class="px-4 py-3 text-slate-400">{{ inv.orderNumber || '—' }}</td>
-                  <td class="px-4 py-3 text-slate-400">{{ inv.status }}</td>
+                  <td class="px-4 py-3 text-slate-400">{{ statusLabel(inv) }}</td>
                   <td class="px-4 py-3">{{ money(inv.totalTtc) }}</td>
                   <td class="px-4 py-3">{{ money(inv.amountPaid) }}</td>
                   <td class="px-4 py-3">
@@ -112,13 +207,15 @@ import { PageState } from '../../shared/utils/page-state';
                         [loading]="downloadingId() === inv.id"
                         (action)="downloadPdf(inv)"
                       />
-                      <app-icon-action
-                        icon="trash"
-                        label="Supprimer la facture"
-                        variant="danger"
-                        [loading]="deletingId() === inv.id"
-                        (action)="confirmDelete(inv)"
-                      />
+                      @if (deletable(inv)) {
+                        <app-icon-action
+                          icon="trash"
+                          label="Supprimer la facture"
+                          variant="danger"
+                          [loading]="deletingId() === inv.id"
+                          (action)="confirmDelete(inv)"
+                        />
+                      }
                     </div>
                   </td>
                 </tr>
@@ -232,6 +329,9 @@ export class InvoicesListPageComponent {
   readonly expandedId = signal<string | null>(null);
 
   readonly customerName = invoiceCustomerDisplayName;
+  readonly exporting = signal(false);
+  exportFrom = firstDayOfYear();
+  exportTo = today();
 
   constructor() {
     effect(() => {
@@ -243,6 +343,39 @@ export class InvoicesListPageComponent {
 
   money(v: number): string {
     return formatMoney(v);
+  }
+
+  statusLabel(inv: Invoice): string {
+    return INVOICE_STATUS_LABELS[inv.status] ?? inv.status;
+  }
+
+  /** Une facture émise par l'ERP est inaltérable (avoir) ; brouillons et imports de scan restent supprimables. */
+  deletable(inv: Invoice): boolean {
+    return !inv.issuedAt || (inv.invoiceType === 'STANDARD' && !!inv.merchant);
+  }
+
+  exportCsv(): void {
+    const workspaceId = this.workspaces.selectedId();
+    if (!workspaceId || this.exporting() || !this.exportFrom || !this.exportTo) {
+      return;
+    }
+    this.exporting.set(true);
+    this.error.set(null);
+    this.api.exportCsv(workspaceId, this.exportFrom, this.exportTo).subscribe({
+      next: (blob) => {
+        const url = URL.createObjectURL(new Blob([blob], { type: 'text/csv;charset=utf-8' }));
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `export-factures-${this.exportFrom}-${this.exportTo}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+        this.exporting.set(false);
+      },
+      error: (err) => {
+        this.error.set(apiErrorMessage(err, 'Export impossible'));
+        this.exporting.set(false);
+      },
+    });
   }
 
   onPageChange(index: number): void {

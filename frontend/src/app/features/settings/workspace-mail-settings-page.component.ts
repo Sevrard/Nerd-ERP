@@ -191,7 +191,7 @@ const KIND_LABELS: Record<EmailLogEntry['kind'], string> = {
           @if (!log().length) {
             <p class="text-sm text-slate-500">Aucun e-mail envoyé depuis ce workspace.</p>
           } @else {
-            <div class="overflow-hidden rounded-xl border border-slate-800">
+            <div class="overflow-x-auto rounded-xl border border-slate-800">
               <table class="min-w-full divide-y divide-slate-800 text-sm">
                 <thead class="bg-slate-900/80 text-left text-xs uppercase text-slate-500">
                   <tr>

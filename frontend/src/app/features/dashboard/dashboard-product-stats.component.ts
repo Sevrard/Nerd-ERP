@@ -23,7 +23,7 @@ const TOP_N = 5;
     @if (loading()) {
       <app-loading-state />
     } @else {
-      <div class="grid gap-6 xl:grid-cols-2">
+      <div class="grid min-w-0 gap-6 xl:grid-cols-2 [&>*]:min-w-0">
         <app-dashboard-revenue-chart [points]="trendPoints()" [periodLabel]="trendPeriodLabel()" />
 
         <article class="rounded-2xl border border-slate-800/90 bg-slate-900/70 p-5 sm:p-6">

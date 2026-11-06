@@ -33,7 +33,7 @@ interface KpiCard {
     <div class="w-full space-y-6">
       <div class="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 class="text-2xl font-bold tracking-tight text-white">Dashboard</h1>
+          <h1 class="text-xl font-bold tracking-tight text-white sm:text-2xl">Dashboard</h1>
           <p class="text-sm text-slate-400">Indicateurs du workspace · période personnalisable</p>
         </div>
         <form class="flex flex-wrap items-end gap-2" [formGroup]="period" (ngSubmit)="reload()">
@@ -78,22 +78,22 @@ interface KpiCard {
       @if (loading()) {
         <app-loading-state />
       } @else if (summary()) {
-        <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-4">
+        <div class="grid grid-cols-2 gap-2 sm:gap-4 lg:grid-cols-4 2xl:grid-cols-4">
           @for (card of cards(); track card.label) {
             <article
-              class="relative overflow-hidden rounded-2xl border border-slate-800/90 bg-gradient-to-br from-slate-900/90 to-slate-950/90 p-5 shadow-sm shadow-black/20"
+              class="relative overflow-hidden rounded-2xl border border-slate-800/90 bg-gradient-to-br from-slate-900/90 to-slate-950/90 p-3 shadow-sm shadow-black/20 sm:p-5"
             >
               <div
-                class="absolute right-4 top-4 flex size-10 items-center justify-center rounded-xl"
+                class="absolute right-3 top-3 flex size-8 items-center justify-center rounded-xl sm:right-4 sm:top-4 sm:size-10"
                 [class]="card.iconBg"
               >
                 <span [class]="card.iconColor">
-                  <app-lucide-icon [name]="card.icon" [size]="20" />
+                  <app-lucide-icon [name]="card.icon" [size]="18" />
                 </span>
               </div>
-              <p class="pr-12 text-[11px] font-semibold uppercase tracking-wide text-slate-500">{{ card.label }}</p>
-              <p class="mt-2 text-2xl font-bold tabular-nums text-white">{{ card.value }}</p>
-              <p class="mt-1 text-xs text-slate-500">{{ card.hint }}</p>
+              <p class="pr-10 text-[10px] font-semibold uppercase tracking-wide text-slate-500 sm:pr-12 sm:text-[11px]">{{ card.label }}</p>
+              <p class="mt-2 text-lg font-bold tabular-nums text-white sm:text-2xl">{{ card.value }}</p>
+              <p class="mt-1 hidden text-xs text-slate-500 sm:block">{{ card.hint }}</p>
             </article>
           }
         </div>

@@ -6,10 +6,33 @@
   html,
   body {
     @apply min-h-full h-full bg-slate-950 text-slate-100 antialiased;
+    /* Pas de zoom automatique du texte en paysage sur iOS, pas de halo bleu au tap. */
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+    overscroll-behavior-y: none;
   }
 
   app-root {
     @apply block min-h-screen;
+  }
+
+  /* Sur smartphone, un champ < 16px déclenche un zoom automatique de la page sous iOS Safari. */
+  @media (max-width: 767px) {
+    input:not([type='checkbox']):not([type='radio']):not([type='color']):not([type='file']),
+    select,
+    textarea {
+      font-size: 16px !important;
+    }
+  }
+}
+
+@layer utilities {
+  /* Marges de sécurité (encoche, barre d'accueil) pour les éléments fixés en bas / en haut. */
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .pt-safe {
+    padding-top: env(safe-area-inset-top, 0px);
   }
 }
 

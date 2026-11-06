@@ -18,54 +18,77 @@
       </div>
     </div>
 
-    <a
-      routerLink="/customers/new"
-      class="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-emerald-500 to-teal-600 px-4 py-2 text-sm font-semibold text-slate-950 shadow-lg shadow-emerald-500/20 transition hover:from-emerald-400 hover:to-teal-500"
-    >
-      <app-lucide-icon name="user-plus" [size]="16" />
-      Nouveau client
-    </a>
+    <div class="flex flex-wrap items-center gap-2">
+      @if (auth.canAdminister()) {
+        <button
+          type="button"
+          class="inline-flex items-center gap-2 rounded-lg border border-slate-700/60 bg-slate-800 px-3 py-2 text-sm font-medium text-slate-200 transition hover:bg-slate-700"
+          (click)="importOpen.set(true)"
+        >
+          <app-lucide-icon name="download" [size]="16" class="text-cyan-400" />
+          Importer CSV
+        </button>
+      }
+      <a
+        routerLink="/customers/new"
+        class="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-emerald-500 to-teal-600 px-4 py-2 text-sm font-semibold text-slate-950 shadow-lg shadow-emerald-500/20 transition hover:from-emerald-400 hover:to-teal-500"
+      >
+        <app-lucide-icon name="user-plus" [size]="16" />
+        Nouveau client
+      </a>
+    </div>
   </div>
+
+  @if (importOpen()) {
+    <app-csv-import-dialog
+      title="Importer des clients"
+      templateFileName="modele-clients.csv"
+      [importFn]="importCustomers"
+      [templateFn]="importTemplate"
+      (close)="importOpen.set(false)"
+      (imported)="onImported()"
+    />
+  }
 
   @if (error()) {
     <app-error-banner [message]="error()!" />
   }
 
-  <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-    <div class="flex items-center gap-4 rounded-xl border border-slate-800 bg-slate-900/70 p-4">
-      <div class="rounded-lg border border-cyan-500/20 bg-cyan-500/10 p-3 text-cyan-400">
+  <div class="grid grid-cols-2 gap-2 sm:gap-4 xl:grid-cols-4">
+    <div class="flex items-center gap-3 rounded-xl border border-slate-800 bg-slate-900/70 p-3 sm:gap-4 sm:p-4">
+      <div class="hidden rounded-lg border border-cyan-500/20 bg-cyan-500/10 p-3 text-cyan-400 sm:block">
         <app-lucide-icon name="users" [size]="24" />
       </div>
       <div>
         <p class="text-xs font-medium text-slate-400">Total contacts</p>
-        <p class="text-2xl font-bold tracking-tight text-white">{{ stats().total }}</p>
+        <p class="text-xl font-bold tracking-tight text-white sm:text-2xl">{{ stats().total }}</p>
       </div>
     </div>
-    <div class="flex items-center gap-4 rounded-xl border border-slate-800 bg-slate-900/70 p-4">
-      <div class="rounded-lg border border-cyan-500/20 bg-cyan-500/10 p-3 text-cyan-400">
+    <div class="flex items-center gap-3 rounded-xl border border-slate-800 bg-slate-900/70 p-3 sm:gap-4 sm:p-4">
+      <div class="hidden rounded-lg border border-cyan-500/20 bg-cyan-500/10 p-3 text-cyan-400 sm:block">
         <app-lucide-icon name="user-plus" [size]="24" />
       </div>
       <div>
         <p class="text-xs font-medium text-slate-400">Prospects</p>
-        <p class="text-2xl font-bold tracking-tight text-white">{{ stats().prospects }}</p>
+        <p class="text-xl font-bold tracking-tight text-white sm:text-2xl">{{ stats().prospects }}</p>
       </div>
     </div>
-    <div class="flex items-center gap-4 rounded-xl border border-slate-800 bg-slate-900/70 p-4">
-      <div class="rounded-lg border border-emerald-500/20 bg-emerald-500/10 p-3 text-emerald-400">
+    <div class="flex items-center gap-3 rounded-xl border border-slate-800 bg-slate-900/70 p-3 sm:gap-4 sm:p-4">
+      <div class="hidden rounded-lg border border-emerald-500/20 bg-emerald-500/10 p-3 text-emerald-400 sm:block">
         <app-lucide-icon name="check" [size]="24" />
       </div>
       <div>
         <p class="text-xs font-medium text-slate-400">Clients actifs</p>
-        <p class="text-2xl font-bold tracking-tight text-white">{{ stats().clients }}</p>
+        <p class="text-xl font-bold tracking-tight text-white sm:text-2xl">{{ stats().clients }}</p>
       </div>
     </div>
-    <div class="flex items-center gap-4 rounded-xl border border-slate-800 bg-slate-900/70 p-4">
-      <div class="rounded-lg border border-amber-500/20 bg-amber-500/10 p-3 text-amber-400">
+    <div class="flex items-center gap-3 rounded-xl border border-slate-800 bg-slate-900/70 p-3 sm:gap-4 sm:p-4">
+      <div class="hidden rounded-lg border border-amber-500/20 bg-amber-500/10 p-3 text-amber-400 sm:block">
         <app-lucide-icon name="clock" [size]="24" />
       </div>
       <div>
         <p class="text-xs font-medium text-slate-400">Relances à traiter</p>
-        <p class="text-2xl font-bold tracking-tight text-white">{{ stats().followUpsDue }}</p>
+        <p class="text-xl font-bold tracking-tight text-white sm:text-2xl">{{ stats().followUpsDue }}</p>
       </div>
     </div>
   </div>
@@ -122,7 +145,44 @@
     <app-empty-state title="Aucun client trouvé." />
   } @else {
     <div class="overflow-hidden rounded-xl border border-slate-800/80 bg-slate-900/60 shadow-xl">
-      <div class="overflow-x-auto">
+      <!-- Smartphone : une carte par client, actions principales accessibles au pouce. -->
+      <ul class="divide-y divide-slate-800/60 md:hidden">
+        @for (c of items(); track c.id) {
+          <li class="flex items-stretch gap-2 px-3 py-3">
+            <a [routerLink]="['/customers', c.id]" class="min-w-0 flex-1 active:opacity-70">
+              <div class="flex items-start justify-between gap-2">
+                <p class="truncate text-sm font-semibold text-slate-100">{{ label(c) }}</p>
+                <span
+                  class="inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold"
+                  [class]="statusBadgeClass(c.status)"
+                >
+                  {{ statusLabel(c.status) }}
+                </span>
+              </div>
+              <p class="mt-0.5 text-xs text-slate-500">{{ typeLabel(c) }} · {{ locationLine(c) }}</p>
+              @if (c.email) {
+                <p class="mt-1 truncate text-xs text-slate-400">{{ c.email }}</p>
+              }
+              @if (c.nextFollowUpAt) {
+                <p class="mt-1 text-[11px] text-amber-400/90">Relance : {{ c.nextFollowUpAt | date: 'dd/MM/yyyy' }}</p>
+              }
+            </a>
+            <div class="flex shrink-0 flex-col justify-center gap-1">
+              @if (c.phone) {
+                <a
+                  [href]="'tel:' + c.phone"
+                  class="inline-flex size-10 items-center justify-center rounded-lg border border-slate-700/80 text-emerald-400 active:bg-slate-800"
+                  [attr.aria-label]="'Appeler ' + label(c)"
+                >
+                  <app-lucide-icon name="phone" [size]="16" />
+                </a>
+              }
+              <app-icon-action icon="pencil" label="Modifier" [link]="['/customers', c.id, 'edit']" />
+            </div>
+          </li>
+        }
+      </ul>
+      <div class="hidden overflow-x-auto md:block">
         <table class="w-full border-collapse text-left">
           <thead>
             <tr class="border-b border-slate-800 bg-slate-900/90 text-[11px] font-semibold text-slate-400">

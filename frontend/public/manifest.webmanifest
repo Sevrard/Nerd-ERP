@@ -1,0 +1,26 @@
+{
+  "name": "Nerd ERP",
+  "short_name": "Nerd ERP",
+  "description": "Gestion commerciale : clients, devis, factures, paiements.",
+  "lang": "fr",
+  "start_url": "/dashboard",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0B0E11",
+  "theme_color": "#0B0E11",
+  "icons": [
+    {
+      "src": "branding/nerd-forge-logo.png",
+      "sizes": "142x106",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "branding/nerd-group-logo.png",
+      "sizes": "302x80",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

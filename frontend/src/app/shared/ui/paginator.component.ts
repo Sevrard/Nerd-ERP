@@ -40,7 +40,7 @@ type PageMeta = Pick<PageResponse<unknown>, 'page' | 'size' | 'totalElements' | 
             <div class="flex items-center gap-1">
               <button
                 type="button"
-                class="rounded-lg border border-slate-700/80 px-2 py-1 text-slate-300 transition hover:border-slate-600 hover:bg-slate-800 hover:text-white disabled:pointer-events-none disabled:opacity-40"
+                class="min-h-9 min-w-9 rounded-lg border border-slate-700/80 px-2 py-1 text-slate-300 transition hover:border-slate-600 hover:bg-slate-800 hover:text-white disabled:pointer-events-none disabled:opacity-40 md:min-h-0 md:min-w-0"
                 [disabled]="disabled() || meta().page === 0"
                 aria-label="Page précédente"
                 (click)="go(meta().page - 1)"
@@ -53,7 +53,7 @@ type PageMeta = Pick<PageResponse<unknown>, 'page' | 'size' | 'totalElements' | 
                 } @else {
                   <button
                     type="button"
-                    class="min-w-8 rounded-lg border px-2 py-1 transition disabled:pointer-events-none"
+                    class="min-h-9 min-w-9 rounded-lg border px-2 py-1 transition disabled:pointer-events-none md:min-h-0 md:min-w-8"
                     [class]="
                       p === meta().page
                         ? 'border-cyan-500/60 bg-cyan-500/10 text-cyan-300'
@@ -69,7 +69,7 @@ type PageMeta = Pick<PageResponse<unknown>, 'page' | 'size' | 'totalElements' | 
               }
               <button
                 type="button"
-                class="rounded-lg border border-slate-700/80 px-2 py-1 text-slate-300 transition hover:border-slate-600 hover:bg-slate-800 hover:text-white disabled:pointer-events-none disabled:opacity-40"
+                class="min-h-9 min-w-9 rounded-lg border border-slate-700/80 px-2 py-1 text-slate-300 transition hover:border-slate-600 hover:bg-slate-800 hover:text-white disabled:pointer-events-none disabled:opacity-40 md:min-h-0 md:min-w-0"
                 [disabled]="disabled() || meta().page >= meta().totalPages - 1"
                 aria-label="Page suivante"
                 (click)="go(meta().page + 1)"

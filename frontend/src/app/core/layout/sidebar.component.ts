@@ -2,7 +2,18 @@ import { Component, inject, signal } from '@angular/core';
 import { LayoutUiService } from './layout-ui.service';
 import { RouterLink, RouterLinkActive } from '@angular/router';
 import { WorkspaceService } from '../workspace/workspace.service';
-import { Workspace, WorkspaceUpdatePayload } from '../../shared/models/workspace.model';
+import {
+  DEFAULT_NUMBER_PATTERN,
+  DocumentSequenceType,
+  SEQUENCE_RESET_LABELS,
+  SEQUENCE_TYPE_LABELS,
+  SequenceCounter,
+  SequenceReset,
+  VAT_REGIME_LABELS,
+  VatRegime,
+  Workspace,
+  WorkspaceUpdatePayload,
+} from '../../shared/models/workspace.model';
 import { AuthService } from '../auth/auth.service';
 import { roleLabel } from '../../shared/models/auth.model';
 import { workspaceUi } from '../workspace/workspace-ui.config';
@@ -30,8 +41,8 @@ import { apiErrorMessage } from '../../shared/utils/api-error.util';
       [class.-translate-x-full]="!layout.mobileSidebarOpen()"
       [class.translate-x-0]="layout.mobileSidebarOpen()"
     >
-      <div class="shrink-0 border-b border-slate-800 px-4 py-4">
-        <a routerLink="/dashboard" class="block" (click)="layout.closeMobileSidebar()">
+      <div class="pt-safe flex shrink-0 items-center gap-2 border-b border-slate-800 px-4 py-4">
+        <a routerLink="/dashboard" class="block min-w-0 flex-1" (click)="layout.closeMobileSidebar()">
           <img
             src="/branding/nerd-group-logo.png"
             alt="NERD GROUP"
@@ -40,6 +51,14 @@ import { apiErrorMessage } from '../../shared/utils/api-error.util';
             height="48"
           />
         </a>
+        <button
+          type="button"
+          class="inline-flex size-10 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white md:hidden"
+          aria-label="Fermer le menu"
+          (click)="layout.closeMobileSidebar()"
+        >
+          <app-lucide-icon name="x" [size]="20" />
+        </button>
       </div>
 
       <div class="min-h-0 flex-1 overflow-y-auto p-4">
@@ -218,14 +237,16 @@ import { apiErrorMessage } from '../../shared/utils/api-error.util';
         }
       </div>
 
-      <div class="mt-auto shrink-0 border-t border-slate-800 bg-[#0B0E11] p-4">
+      <div class="pb-safe mt-auto shrink-0 border-t border-slate-800 bg-[#0B0E11] p-4">
         <a routerLink="/settings/profile" class="group block" title="Mon profil" (click)="layout.closeMobileSidebar()">
           <p class="truncate text-sm font-medium text-white group-hover:text-brand-400">{{ auth.profile()?.displayName || auth.profile()?.email }}</p>
           <p class="truncate text-xs text-slate-400" [title]="auth.profile()?.email">{{ auth.profile()?.email }}</p>
           <p class="mt-0.5 text-xs text-slate-500">{{ roleLabel(auth.profile()?.role) }}</p>
         </a>
-        <div class="mt-3 flex items-center gap-3 text-xs">
+        <div class="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
           <a routerLink="/settings/profile" class="text-slate-400 hover:text-white" (click)="layout.closeMobileSidebar()">Mon profil</a>
+          <span class="text-slate-700">·</span>
+          <a routerLink="/help" class="text-slate-400 hover:text-white" (click)="layout.closeMobileSidebar()">Guide</a>
           <span class="text-slate-700">·</span>
           <button type="button" class="text-slate-400 hover:text-white" (click)="auth.logout()">Déconnexion</button>
         </div>
@@ -457,6 +478,192 @@ import { apiErrorMessage } from '../../shared/utils/api-error.util';
                 [disabled]="workspaceBusy()"
               />
             </label>
+            <label class="block text-sm text-slate-300">
+              Préfixe avoir
+              <input
+                type="text"
+                maxlength="20"
+                class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 font-mono text-sm text-white"
+                [(ngModel)]="editForm.creditNotePrefix"
+                name="editCNPrefix"
+                [disabled]="workspaceBusy()"
+              />
+            </label>
+          </div>
+
+          <p class="mt-4 text-xs font-semibold uppercase tracking-wider text-cyan-500/90">Numérotation</p>
+          <p class="mt-1 text-xs text-slate-500">
+            Jetons : <code>{{ '{PREFIX}' }}</code>, <code>{{ '{YYYY}' }}</code>, <code>{{ '{YY}' }}</code>,
+            <code>{{ '{MM}' }}</code>, <code>{{ '{SEQ}' }}</code> (5 chiffres) ou <code>{{ '{SEQ:n}' }}</code>.
+            Le motif doit porter l'année (remise à zéro annuelle) ou l'année et le mois (mensuelle).
+          </p>
+          <div class="mt-2 grid gap-3 sm:grid-cols-2">
+            <label class="block text-sm text-slate-300">
+              Motif
+              <input
+                type="text"
+                maxlength="64"
+                [placeholder]="defaultNumberPattern"
+                class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 font-mono text-sm text-white"
+                [(ngModel)]="editForm.numberPattern"
+                name="editNumberPattern"
+                [disabled]="workspaceBusy()"
+              />
+            </label>
+            <label class="block text-sm text-slate-300">
+              Remise à zéro du compteur
+              <select
+                class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white"
+                [(ngModel)]="editForm.sequenceReset"
+                name="editSequenceReset"
+                [disabled]="workspaceBusy()"
+              >
+                @for (r of sequenceResets; track r.value) {
+                  <option [value]="r.value">{{ r.label }}</option>
+                }
+              </select>
+            </label>
+          </div>
+          @if (sequenceCounters().length) {
+            <div class="mt-3 overflow-hidden rounded-lg border border-slate-800">
+              <table class="w-full text-xs">
+                <thead class="bg-slate-900/80 text-left uppercase text-slate-500">
+                  <tr>
+                    <th class="px-3 py-2">Série</th>
+                    <th class="px-3 py-2">Dernier n°</th>
+                    <th class="px-3 py-2">Prochain numéro</th>
+                    @if (auth.canAdminister()) {
+                      <th class="px-3 py-2 text-right">Reprise</th>
+                    }
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-800">
+                  @for (c of sequenceCounters(); track c.type) {
+                    <tr>
+                      <td class="px-3 py-2 text-slate-300">{{ sequenceTypeLabel(c.type) }}</td>
+                      <td class="px-3 py-2 font-mono text-slate-400">{{ c.lastValue }}</td>
+                      <td class="px-3 py-2 font-mono text-white">{{ c.nextNumber }}</td>
+                      @if (auth.canAdminister()) {
+                        <td class="px-3 py-2 text-right">
+                          <button
+                            type="button"
+                            class="rounded border border-slate-700 px-2 py-1 text-[11px] text-slate-300 hover:bg-slate-800 disabled:opacity-50"
+                            [disabled]="workspaceBusy()"
+                            (click)="promptNextNumber(c)"
+                          >
+                            Fixer le prochain n°
+                          </button>
+                        </td>
+                      }
+                    </tr>
+                  }
+                </tbody>
+              </table>
+              <p class="px-3 py-2 text-[11px] text-slate-500">
+                Compteurs de la période en cours (après enregistrement du motif, l'aperçu se met à jour). Un compteur ne peut jamais reculer.
+              </p>
+            </div>
+          }
+
+          <p class="mt-4 text-xs font-semibold uppercase tracking-wider text-cyan-500/90">Mentions légales &amp; conditions de règlement</p>
+          <p class="mt-1 text-xs text-slate-500">Reportées en pied de chaque devis, facture et avoir (art. L441-10 du Code de commerce).</p>
+          <div class="mt-2 grid gap-3 sm:grid-cols-2">
+            <label class="block text-sm text-slate-300 sm:col-span-2">
+              Régime de TVA
+              <select
+                class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white"
+                [(ngModel)]="editForm.vatRegime"
+                name="editVatRegime"
+                [disabled]="workspaceBusy()"
+              >
+                @for (regime of vatRegimes; track regime.value) {
+                  <option [value]="regime.value">{{ regime.label }}</option>
+                }
+              </select>
+            </label>
+            <label class="block text-sm text-slate-300">
+              Délai de paiement (jours)
+              <input
+                type="number"
+                min="0"
+                max="120"
+                class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 font-mono text-sm text-white"
+                [(ngModel)]="editForm.paymentTermsDays"
+                name="editPaymentTerms"
+                [disabled]="workspaceBusy()"
+              />
+            </label>
+            <label class="block text-sm text-slate-300">
+              Pénalités de retard (% annuel)
+              <input
+                type="number"
+                min="0"
+                max="100"
+                step="0.01"
+                class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 font-mono text-sm text-white"
+                [(ngModel)]="editForm.latePenaltyRate"
+                name="editLatePenalty"
+                [disabled]="workspaceBusy()"
+              />
+            </label>
+            <label class="block text-sm text-slate-300">
+              Indemnité de recouvrement (€)
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 font-mono text-sm text-white"
+                [(ngModel)]="editForm.recoveryFeeAmount"
+                name="editRecoveryFee"
+                [disabled]="workspaceBusy()"
+              />
+            </label>
+            <label class="block text-sm text-slate-300">
+              Escompte paiement anticipé
+              <input
+                type="text"
+                maxlength="255"
+                placeholder="Néant (par défaut)"
+                class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white"
+                [(ngModel)]="editForm.earlyPaymentDiscount"
+                name="editDiscount"
+                [disabled]="workspaceBusy()"
+              />
+            </label>
+            <label class="block text-sm text-slate-300 sm:col-span-2">
+              Conditions de règlement (texte libre, remplace « paiement à N jours »)
+              <input
+                type="text"
+                maxlength="512"
+                placeholder="Ex. Paiement à réception de facture par virement."
+                class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white"
+                [(ngModel)]="editForm.paymentTermsText"
+                name="editPaymentTermsText"
+                [disabled]="workspaceBusy()"
+              />
+            </label>
+            <label class="block text-sm text-slate-300 sm:col-span-2">
+              Mention complémentaire en pied de page
+              <textarea
+                rows="2"
+                maxlength="1024"
+                placeholder="Ex. RCS Paris 123 456 789 — Membre d'une association agréée…"
+                class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white"
+                [(ngModel)]="editForm.legalFooterText"
+                name="editLegalFooter"
+                [disabled]="workspaceBusy()"
+              ></textarea>
+            </label>
+            <label class="flex items-center gap-2 text-sm text-slate-300 sm:col-span-2">
+              <input
+                type="checkbox"
+                class="h-4 w-4 rounded border-slate-600 bg-slate-900 text-cyan-500"
+                [(ngModel)]="editForm.remindersEnabled"
+                name="editReminders"
+                [disabled]="workspaceBusy()"
+              />
+              Relances automatiques par e-mail des factures échues (J+7 puis J+15)
+            </label>
           </div>
 
           @if (editError()) {
@@ -583,7 +790,69 @@ export class SidebarComponent {
       currencyCode: 'EUR',
       invoicePrefix: 'FAC',
       quotationPrefix: 'DEV',
+      creditNotePrefix: 'AV',
+      vatRegime: 'NORMAL',
+      paymentTermsDays: 30,
+      latePenaltyRate: 12,
+      recoveryFeeAmount: 40,
+      earlyPaymentDiscount: '',
+      paymentTermsText: '',
+      legalFooterText: '',
+      remindersEnabled: false,
+      numberPattern: DEFAULT_NUMBER_PATTERN,
+      sequenceReset: 'YEARLY',
     };
+  }
+
+  readonly vatRegimes = (Object.keys(VAT_REGIME_LABELS) as VatRegime[]).map((value) => ({
+    value,
+    label: VAT_REGIME_LABELS[value],
+  }));
+  readonly sequenceResets = (Object.keys(SEQUENCE_RESET_LABELS) as SequenceReset[]).map((value) => ({
+    value,
+    label: SEQUENCE_RESET_LABELS[value],
+  }));
+  readonly defaultNumberPattern = DEFAULT_NUMBER_PATTERN;
+  readonly sequenceCounters = signal<SequenceCounter[]>([]);
+
+  sequenceTypeLabel(type: DocumentSequenceType): string {
+    return SEQUENCE_TYPE_LABELS[type];
+  }
+
+  private loadSequences(id: string): void {
+    this.workspaces.sequences(id).subscribe({
+      next: (list) => this.sequenceCounters.set(list),
+      error: () => this.sequenceCounters.set([]),
+    });
+  }
+
+  /** Reprise d'une numérotation existante (onboarding) : fixe le prochain numéro de la série. */
+  promptNextNumber(counter: SequenceCounter): void {
+    const id = this.editWorkspaceId();
+    if (!id || this.workspaceBusy()) {
+      return;
+    }
+    const raw = window.prompt(
+      `Prochain numéro pour « ${this.sequenceTypeLabel(counter.type)} » (actuellement ${counter.lastValue + 1}) :`,
+      String(counter.lastValue + 1),
+    );
+    if (raw === null) {
+      return;
+    }
+    const next = Number.parseInt(raw, 10);
+    if (!Number.isFinite(next) || next < 1) {
+      this.editError.set('Le prochain numéro doit être un entier ≥ 1.');
+      return;
+    }
+    this.workspaceBusy.set(true);
+    this.editError.set(null);
+    this.workspaces
+      .setNextNumber(id, counter.type, next)
+      .pipe(finalize(() => this.workspaceBusy.set(false)))
+      .subscribe({
+        next: () => this.loadSequences(id),
+        error: (err) => this.editError.set(apiErrorMessage(err, 'Mise à jour du compteur impossible')),
+      });
   }
 
   ui(ws: { slug: string; name: string }) {
@@ -617,7 +886,20 @@ export class SidebarComponent {
       currencyCode: ws.currencyCode || 'EUR',
       invoicePrefix: ws.invoicePrefix || 'FAC',
       quotationPrefix: ws.quotationPrefix || 'DEV',
+      creditNotePrefix: ws.creditNotePrefix || 'AV',
+      vatRegime: ws.vatRegime ?? 'NORMAL',
+      paymentTermsDays: ws.paymentTermsDays ?? 30,
+      latePenaltyRate: ws.latePenaltyRate ?? 12,
+      recoveryFeeAmount: ws.recoveryFeeAmount ?? 40,
+      earlyPaymentDiscount: ws.earlyPaymentDiscount ?? '',
+      paymentTermsText: ws.paymentTermsText ?? '',
+      legalFooterText: ws.legalFooterText ?? '',
+      remindersEnabled: ws.remindersEnabled ?? false,
+      numberPattern: ws.numberPattern || DEFAULT_NUMBER_PATTERN,
+      sequenceReset: ws.sequenceReset ?? 'YEARLY',
     };
+    this.sequenceCounters.set([]);
+    this.loadSequences(ws.id);
     this.editOpen.set(true);
   }
 
@@ -652,6 +934,17 @@ export class SidebarComponent {
       currencyCode: this.editForm.currencyCode.trim().toUpperCase(),
       invoicePrefix: this.editForm.invoicePrefix.trim(),
       quotationPrefix: this.editForm.quotationPrefix.trim(),
+      creditNotePrefix: this.nullIfBlank(this.editForm.creditNotePrefix),
+      vatRegime: this.editForm.vatRegime ?? 'NORMAL',
+      paymentTermsDays: this.numberOrNull(this.editForm.paymentTermsDays),
+      latePenaltyRate: this.numberOrNull(this.editForm.latePenaltyRate),
+      recoveryFeeAmount: this.numberOrNull(this.editForm.recoveryFeeAmount),
+      earlyPaymentDiscount: this.nullIfBlank(this.editForm.earlyPaymentDiscount),
+      paymentTermsText: this.nullIfBlank(this.editForm.paymentTermsText),
+      legalFooterText: this.nullIfBlank(this.editForm.legalFooterText),
+      remindersEnabled: !!this.editForm.remindersEnabled,
+      numberPattern: this.nullIfBlank(this.editForm.numberPattern),
+      sequenceReset: this.editForm.sequenceReset ?? 'YEARLY',
     };
     this.workspaceBusy.set(true);
     this.editError.set(null);
@@ -664,6 +957,14 @@ export class SidebarComponent {
           this.editError.set(apiErrorMessage(err, 'Mise à jour impossible'));
         },
       });
+  }
+
+  private numberOrNull(value: number | string | null | undefined): number | null {
+    if (value === null || value === undefined || value === '') {
+      return null;
+    }
+    const n = Number(value);
+    return Number.isFinite(n) ? n : null;
   }
 
   private nullIfBlank(value: string | null | undefined): string | null {

@@ -6,8 +6,9 @@ import { formatMoney } from '../../shared/utils/money.util';
   selector: 'app-dashboard-revenue-chart',
   standalone: true,
   imports: [],
+  host: { class: 'block min-w-0' },
   template: `
-    <article class="flex h-full min-h-[320px] flex-col rounded-2xl border border-slate-800/90 bg-slate-900/70 p-5 sm:p-6">
+    <article class="flex h-full min-h-[320px] min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-800/90 bg-slate-900/70 p-4 sm:p-6">
       <h3 class="text-base font-semibold text-white">Evolution CA Facturé vs Encaissé</h3>
       <p class="mt-0.5 text-xs text-slate-500">{{ subtitle() }}</p>
 
@@ -27,7 +28,8 @@ import { formatMoney } from '../../shared/utils/money.util';
             </div>
             <div class="relative min-w-0 flex-1">
               <svg
-                class="h-full w-full min-h-[200px]"
+                class="block h-full w-full min-h-[200px] max-w-full"
+                width="100%"
                 [attr.viewBox]="'0 0 ' + svgWidth() + ' ' + height"
                 preserveAspectRatio="xMidYMid meet"
               >

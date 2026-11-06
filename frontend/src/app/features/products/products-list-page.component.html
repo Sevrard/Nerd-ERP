@@ -36,6 +36,16 @@
         <app-lucide-icon name="tag" [size]="16" class="text-purple-400" />
         + Catégorie
       </button>
+      @if (auth.canAdminister()) {
+        <button
+          type="button"
+          class="inline-flex items-center gap-2 rounded-lg border border-slate-700/60 bg-slate-800 px-3 py-2 text-sm font-medium text-slate-200 transition hover:bg-slate-700"
+          (click)="importOpen.set(true)"
+        >
+          <app-lucide-icon name="download" [size]="16" class="text-cyan-400" />
+          Importer CSV
+        </button>
+      }
       <a
         routerLink="/products/new"
         class="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-emerald-500 to-teal-600 px-4 py-2 text-sm font-semibold text-slate-950 shadow-lg shadow-emerald-500/20 transition hover:from-emerald-400 hover:to-teal-500"
@@ -46,48 +56,59 @@
     </div>
   </div>
 
+  @if (importOpen()) {
+    <app-csv-import-dialog
+      title="Importer des produits"
+      templateFileName="modele-produits.csv"
+      [importFn]="importProducts"
+      [templateFn]="importTemplate"
+      (close)="importOpen.set(false)"
+      (imported)="onImported()"
+    />
+  }
+
   @if (error()) {
     <app-error-banner [message]="error()!" />
   }
 
   <!-- KPI -->
-  <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-    <div class="flex items-center gap-4 rounded-xl border border-slate-800 bg-slate-900/70 p-4">
-      <div class="rounded-lg border border-cyan-500/20 bg-cyan-500/10 p-3 text-cyan-400">
+  <div class="grid grid-cols-2 gap-2 sm:gap-4 xl:grid-cols-4">
+    <div class="flex items-center gap-3 rounded-xl border border-slate-800 bg-slate-900/70 p-3 sm:gap-4 sm:p-4">
+      <div class="hidden sm:block rounded-lg border border-cyan-500/20 bg-cyan-500/10 p-3 text-cyan-400">
         <app-lucide-icon name="package" [size]="24" />
       </div>
       <div>
         <p class="text-xs font-medium text-slate-400">Total prestations</p>
-        <p class="text-2xl font-bold tracking-tight text-white">{{ stats().totalProds }}</p>
+        <p class="text-xl font-bold tracking-tight text-white sm:text-2xl">{{ stats().totalProds }}</p>
       </div>
     </div>
-    <div class="flex items-center gap-4 rounded-xl border border-slate-800 bg-slate-900/70 p-4">
-      <div class="rounded-lg border border-purple-500/20 bg-purple-500/10 p-3 text-purple-400">
+    <div class="flex items-center gap-3 rounded-xl border border-slate-800 bg-slate-900/70 p-3 sm:gap-4 sm:p-4">
+      <div class="hidden sm:block rounded-lg border border-purple-500/20 bg-purple-500/10 p-3 text-purple-400">
         <app-lucide-icon name="boxes" [size]="24" />
       </div>
       <div>
         <p class="text-xs font-medium text-slate-400">Packages / packs</p>
-        <p class="text-2xl font-bold tracking-tight text-white">{{ stats().totalPkgs }}</p>
+        <p class="text-xl font-bold tracking-tight text-white sm:text-2xl">{{ stats().totalPkgs }}</p>
       </div>
     </div>
-    <div class="flex items-center gap-4 rounded-xl border border-slate-800 bg-slate-900/70 p-4">
-      <div class="rounded-lg border border-emerald-500/20 bg-emerald-500/10 p-3 text-emerald-400">
+    <div class="flex items-center gap-3 rounded-xl border border-slate-800 bg-slate-900/70 p-3 sm:gap-4 sm:p-4">
+      <div class="hidden sm:block rounded-lg border border-emerald-500/20 bg-emerald-500/10 p-3 text-emerald-400">
         <app-lucide-icon name="clock" [size]="24" />
       </div>
       <div>
         <p class="text-xs font-medium text-slate-400">TJM moyen (régie)</p>
-        <p class="text-2xl font-bold tracking-tight text-white">
+        <p class="text-xl font-bold tracking-tight text-white sm:text-2xl">
           {{ stats().avgTjm }} € <span class="text-xs font-normal text-slate-400">/ jour</span>
         </p>
       </div>
     </div>
-    <div class="flex items-center gap-4 rounded-xl border border-slate-800 bg-slate-900/70 p-4">
-      <div class="rounded-lg border border-amber-500/20 bg-amber-500/10 p-3 text-amber-400">
+    <div class="flex items-center gap-3 rounded-xl border border-slate-800 bg-slate-900/70 p-3 sm:gap-4 sm:p-4">
+      <div class="hidden sm:block rounded-lg border border-amber-500/20 bg-amber-500/10 p-3 text-amber-400">
         <app-lucide-icon name="euro" [size]="24" />
       </div>
       <div>
         <p class="text-xs font-medium text-slate-400">Valeur cumulée catalogue</p>
-        <p class="text-2xl font-bold tracking-tight text-white">
+        <p class="text-xl font-bold tracking-tight text-white sm:text-2xl">
           {{ stats().totalCatalogValue.toLocaleString('fr-FR') }} €
         </p>
       </div>
@@ -95,10 +116,10 @@
   </div>
 
   <!-- Onglets -->
-  <div class="flex border-b border-slate-800 text-sm font-medium">
+  <div class="-mx-2 flex overflow-x-auto border-b border-slate-800 px-2 text-sm font-medium [scrollbar-width:none] sm:mx-0 sm:px-0">
     <button
       type="button"
-      class="flex items-center gap-2 border-b-2 px-4 pb-3 transition"
+      class="flex shrink-0 items-center gap-2 whitespace-nowrap border-b-2 px-3 pb-3 transition sm:px-4"
       [class.border-cyan-400]="activeTab() === 'products'"
       [class.font-semibold]="activeTab() === 'products'"
       [class.text-cyan-400]="activeTab() === 'products'"
@@ -114,7 +135,7 @@
     </button>
     <button
       type="button"
-      class="flex items-center gap-2 border-b-2 px-4 pb-3 transition"
+      class="flex shrink-0 items-center gap-2 whitespace-nowrap border-b-2 px-3 pb-3 transition sm:px-4"
       [class.border-cyan-400]="activeTab() === 'categories'"
       [class.font-semibold]="activeTab() === 'categories'"
       [class.text-cyan-400]="activeTab() === 'categories'"
@@ -128,7 +149,7 @@
     </button>
     <button
       type="button"
-      class="flex items-center gap-2 border-b-2 px-4 pb-3 transition"
+      class="flex shrink-0 items-center gap-2 whitespace-nowrap border-b-2 px-3 pb-3 transition sm:px-4"
       [class.border-purple-400]="activeTab() === 'packages'"
       [class.font-semibold]="activeTab() === 'packages'"
       [class.text-purple-400]="activeTab() === 'packages'"
@@ -204,7 +225,45 @@
         <app-empty-state title="Aucune prestation trouvée." />
       } @else {
         <div class="overflow-hidden rounded-xl border border-slate-800/80 bg-slate-900/60 shadow-xl">
-          <div class="overflow-x-auto">
+          <!-- Smartphone : une carte par produit (lecture + accès fiche), édition inline réservée au bureau. -->
+          <ul class="divide-y divide-slate-800/60 md:hidden">
+            @for (p of items(); track p.id) {
+              @let mcat = categoryById(p.categoryId);
+              @let mcolor = categoryColor(mcat);
+              <li class="flex items-center gap-2 px-3 py-3">
+                <a [routerLink]="['/products', p.id, 'edit']" class="min-w-0 flex-1 active:opacity-70">
+                  <div class="flex items-start justify-between gap-2">
+                    <p class="truncate text-sm font-semibold text-slate-100">{{ p.name }}</p>
+                    <p class="shrink-0 font-mono text-sm font-bold text-white">
+                      {{ priceFormatted(p.unitPriceHt) }} €
+                      <span class="text-[11px] font-normal text-slate-500">/ {{ p.unitLabel }}</span>
+                    </p>
+                  </div>
+                  <p class="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-slate-500">
+                    <span class="font-mono">{{ p.referenceCode }}</span>
+                    <span>TVA {{ p.vatRate }} %</span>
+                    @if (!p.active) {
+                      <span class="text-amber-400">inactif</span>
+                    }
+                  </p>
+                  <span
+                    class="mt-1.5 inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-[11px] font-medium"
+                    [class]="mcolor.bg + ' ' + mcolor.text + ' ' + mcolor.border"
+                  >
+                    <span class="h-1.5 w-1.5 rounded-full" [style.background-color]="mcolor.hex"></span>
+                    {{ mcat?.label ?? p.categoryLabel ?? 'Non catégorisé' }}
+                  </span>
+                </a>
+                <app-icon-action
+                  icon="copy"
+                  label="Dupliquer"
+                  [loading]="duplicatingId() === p.id"
+                  (action)="duplicateProduct(p)"
+                />
+              </li>
+            }
+          </ul>
+          <div class="hidden overflow-x-auto md:block">
             <table class="w-full border-collapse text-left">
               <thead>
                 <tr class="border-b border-slate-800 bg-slate-900/90 text-[11px] font-semibold text-slate-400">
