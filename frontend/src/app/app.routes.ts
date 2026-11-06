@@ -1,6 +1,7 @@
 import { Routes } from '@angular/router';
 import { authGuard } from './core/auth/auth.guard';
 import { MainLayoutComponent } from './core/layout/main-layout.component';
+import { moduleGuard, platformAdminGuard } from './core/modules/module.guard';
 
 export const routes: Routes = [
   {
@@ -46,8 +47,19 @@ export const routes: Routes = [
       },
       {
         path: 'maintenance',
+        canActivate: [moduleGuard('MAINTENANCE')],
         loadComponent: () =>
           import('./features/maintenance/maintenance-page.component').then((m) => m.MaintenancePageComponent),
+      },
+      {
+        path: 'module-disabled',
+        loadComponent: () =>
+          import('./core/modules/module-disabled-page.component').then((m) => m.ModuleDisabledPageComponent),
+      },
+      {
+        path: 'admin',
+        canActivate: [platformAdminGuard],
+        loadChildren: () => import('./features/admin/admin.routes').then((m) => m.ADMIN_ROUTES),
       },
     ],
   },

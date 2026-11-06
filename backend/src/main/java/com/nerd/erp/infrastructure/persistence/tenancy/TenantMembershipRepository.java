@@ -10,4 +10,6 @@ import java.util.UUID;
 public interface TenantMembershipRepository extends JpaRepository<TenantMembership, UUID> {
     Optional<TenantMembership> findByTenantIdAndUserId(UUID tenantId, UUID userId);
     List<TenantMembership> findByUserId(UUID userId);
+    List<TenantMembership> findByTenantId(UUID tenantId);
+    List<TenantMembership> findByTenantIdIn(List<UUID> tenantIds);
 }

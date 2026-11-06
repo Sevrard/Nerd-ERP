@@ -3,7 +3,7 @@ package com.nerd.erp.application.workspace;
 import java.text.Normalizer;
 import java.util.Locale;
 
-final class WorkspaceSlugHelper {
+public final class WorkspaceSlugHelper {
 
     private WorkspaceSlugHelper() {
     }
@@ -12,7 +12,7 @@ final class WorkspaceSlugHelper {
         return normalize(name);
     }
 
-    static String normalize(String raw) {
+    public static String normalize(String raw) {
         if (raw == null || raw.isBlank()) {
             return "workspace";
         }
