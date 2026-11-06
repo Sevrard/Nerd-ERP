@@ -26,6 +26,17 @@ describe('WorkspaceService', () => {
     bic: null,
     invoicePrefix: 'FAC',
     quotationPrefix: 'DEV',
+    creditNotePrefix: 'AV',
+    vatRegime: 'NORMAL',
+    paymentTermsDays: 30,
+    latePenaltyRate: 12,
+    recoveryFeeAmount: 40,
+    earlyPaymentDiscount: null,
+    paymentTermsText: null,
+    legalFooterText: null,
+    remindersEnabled: false,
+    numberPattern: '{PREFIX}-{YYYY}-{SEQ:5}',
+    sequenceReset: 'YEARLY',
     ...over,
   });
   const wsA = baseWs({ id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', name: 'Alpha', slug: 'alpha' });

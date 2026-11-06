@@ -172,7 +172,7 @@ public class PdfDocumentRenderer {
             float boxX = MARGIN + leftW;
             float boxH = 86;
             panel(boxX, top - boxH, boxW, boxH);
-            text(bold, 16, ACCENT, boxX + 12, top - 22, model.kind());
+            text(bold, model.kind().length() > 10 ? 12 : 16, ACCENT, boxX + 12, top - 22, model.kind());
             textRight(bold, 8, ACCENT, boxX + boxW - 12, top - 20, model.statusLabel().toUpperCase(Locale.ROOT));
             float ky = top - 42;
             keyValue(boxX + 12, boxX + boxW - 12, ky, "N° " + model.kind().toLowerCase(Locale.ROOT) + " :",
@@ -278,7 +278,7 @@ public class PdfDocumentRenderer {
                 List<String> sku = wrap(nvl(line.sku(), "-"), mono, 7, cols[0] - 10);
                 float rowH = 8 + 11 * label.size() + 9.5f * detail.size() + 6;
                 rowH = Math.max(rowH, 8 + 10 * sku.size() + 6);
-                rowH = Math.max(rowH, 26);
+                rowH = Math.max(rowH, line.hasDiscount() ? 30 : 26);
                 if (y - rowH < MARGIN + FOOTER_H) {
                     newPage();
                     drawTableHead(x);
@@ -308,6 +308,9 @@ public class PdfDocumentRenderer {
                     textCenter(regular, 6.5f, MUTED, (x[2] + x[3]) / 2, ty - 9, line.unit());
                 }
                 textRight(regular, 8.5f, INK, x[4] - 6, ty, money(line.unitPriceHt()));
+                if (line.hasDiscount()) {
+                    textRight(regular, 6.5f, MUTED, x[4] - 6, ty - 9, "remise -" + qty.format(line.discountPercent()) + " %");
+                }
                 textCenter(regular, 8, MUTED, (x[4] + x[5]) / 2, ty, qty.format(nz(line.vatRate())) + " %");
                 textRight(bold, 8.5f, INK, x[6] - 6, ty, money(line.lineTotalHt()));
                 y -= rowH;
@@ -391,6 +394,9 @@ public class PdfDocumentRenderer {
                 boolean success = row.length > 2 && "OK".equals(row[2]);
                 PDFont f = emphasis ? bold : regular;
                 float size = emphasis ? 10.5f : 8.5f;
+                if (!emphasis && row[0].startsWith("TVA ") && row[0].contains("(base")) {
+                    size = 7.5f;
+                }
                 float[] color = emphasis ? INK : success ? SUCCESS : MUTED;
                 if (emphasis) {
                     hr(rx + 10, ry + 9, rx + rightW - 10, PANEL_BORDER, 0.6f);
@@ -412,7 +418,14 @@ public class PdfDocumentRenderer {
                         "-" + money(t.discountAmountHt())});
             }
             rows.add(new String[]{"Total HT :", money(t.totalHt())});
-            rows.add(new String[]{"TVA :", money(t.totalVat())});
+            if (t.vatLines() == null || t.vatLines().isEmpty()) {
+                rows.add(new String[]{"TVA :", money(t.totalVat())});
+            } else {
+                for (PdfDocumentModel.VatLine v : t.vatLines()) {
+                    rows.add(new String[]{"TVA " + qty.format(nz(v.rate())) + " % (base " + money(v.baseHt()) + ") :",
+                            money(v.vatAmount())});
+                }
+            }
             rows.add(new String[]{"TOTAL TTC :", money(t.totalTtc()), "TTC"});
             if (t.hasDeposit()) {
                 rows.add(new String[]{"Acompte à la commande (" + qty.format(t.depositPercent()) + " %) :",

@@ -1,5 +1,6 @@
 package com.nerd.erp.application.document.pdf;
 
+import com.nerd.erp.application.document.DocumentLineBuilder;
 import com.nerd.erp.application.money.MoneyCalculator;
 import com.nerd.erp.domain.customer.Customer;
 import com.nerd.erp.domain.quotation.Quotation;
@@ -48,7 +49,7 @@ public class QuotationPdfGenerator {
         for (QuotationLine l : q.getLines()) {
             String sku = l.getProductId() == null ? null : skuByProductId.get(l.getProductId());
             lines.add(new PdfDocumentModel.Line(sku, l.getDescription(), null, l.getQuantity(), null,
-                    l.getUnitPriceHt(), l.getVatRate(), l.getLineTotalHt()));
+                    l.getUnitPriceHt(), l.getVatRate(), l.getLineTotalHt(), l.getDiscountPercent()));
         }
 
         BigDecimal discountAmount = nz(q.getDiscountAmountHt());
@@ -63,15 +64,19 @@ public class QuotationPdfGenerator {
                 nz(q.getTotalTtc()),
                 nz(q.getDepositPercent()),
                 deposit,
-                null);
+                null,
+                DocumentPdfSupport.vatLines(DocumentLineBuilder.vatBreakdown(q.getLines(), q.getDiscountPercent())));
 
         List<String> terms = new ArrayList<>();
+        String paymentTerms = workspace.getPaymentTermsText() != null && !workspace.getPaymentTermsText().isBlank()
+                ? workspace.getPaymentTermsText().trim()
+                : "paiement à " + workspace.getPaymentTermsDays() + " jours à compter de la livraison / recette finale.";
         if (totals.hasDeposit()) {
             terms.add("Acompte exigé : " + q.getDepositPercent().stripTrailingZeros().toPlainString()
                     + " % à la commande (" + MONEY.format(deposit.setScale(2, RoundingMode.HALF_UP)) + " € TTC).");
-            terms.add("Solde : paiement à 30 jours à compter de la livraison / recette finale.");
+            terms.add("Solde : " + paymentTerms);
         } else {
-            terms.add("Paiement à 30 jours à compter de la livraison / recette finale.");
+            terms.add(Character.toUpperCase(paymentTerms.charAt(0)) + paymentTerms.substring(1));
         }
         terms.add("Mode de paiement : virement bancaire.");
 

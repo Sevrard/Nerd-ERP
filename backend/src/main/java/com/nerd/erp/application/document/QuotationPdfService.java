@@ -40,8 +40,14 @@ public class QuotationPdfService {
     @Transactional(readOnly = true)
     public GeneratedDocument downloadQuotationDocument(UUID quotationId) {
         Quotation quotation = quotationService.requireQuotation(quotationId);
-        Workspace workspace = workspaceService.requireInTenant(quotation.getWorkspaceId(), quotation.getTenantId());
         Customer customer = customerService.requireCustomer(quotation.getCustomerId());
+        return generate(quotation, customer);
+    }
+
+    /** PDF d'un devis déjà chargé (contrôle d'accès à la charge de l'appelant : lien public, e-mail). */
+    @Transactional(readOnly = true)
+    public GeneratedDocument generate(Quotation quotation, Customer customer) {
+        Workspace workspace = workspaceService.requireInTenant(quotation.getWorkspaceId(), quotation.getTenantId());
         Map<UUID, String> skus = skuResolver.resolve(quotation.getTenantId(),
                 quotation.getLines().stream().map(QuotationLine::getProductId).toList());
 

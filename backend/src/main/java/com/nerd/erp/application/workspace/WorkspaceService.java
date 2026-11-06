@@ -4,8 +4,12 @@ import com.nerd.erp.infrastructure.security.core.SecurityContextHelper;
 import com.nerd.erp.api.error.ApiException;
 import com.nerd.erp.api.workspace.WorkspaceCreateRequest;
 import com.nerd.erp.api.workspace.WorkspaceUpdateRequest;
+import com.nerd.erp.application.document.DocumentNumberService;
+import com.nerd.erp.application.document.NumberPattern;
 import com.nerd.erp.application.tenancy.TenantAccessService;
+import com.nerd.erp.domain.document.DocumentSequenceType;
 import com.nerd.erp.domain.organization.Organization;
+import com.nerd.erp.domain.workspace.SequenceReset;
 import com.nerd.erp.domain.workspace.Workspace;
 import com.nerd.erp.api.workspace.WorkspaceResponse;
 import com.nerd.erp.infrastructure.persistence.organization.OrganizationRepository;
@@ -26,17 +30,20 @@ public class WorkspaceService {
     private final OrganizationRepository organizationRepository;
     private final WorkspaceCascadeDeleter workspaceCascadeDeleter;
     private final WorkspaceMapper workspaceMapper;
+    private final DocumentNumberService documentNumberService;
 
     public WorkspaceService(WorkspaceRepository workspaceRepository,
                             TenantAccessService tenantAccessService,
                             OrganizationRepository organizationRepository,
                             WorkspaceCascadeDeleter workspaceCascadeDeleter,
-                            WorkspaceMapper workspaceMapper) {
+                            WorkspaceMapper workspaceMapper,
+                            DocumentNumberService documentNumberService) {
         this.workspaceRepository = workspaceRepository;
         this.tenantAccessService = tenantAccessService;
         this.organizationRepository = organizationRepository;
         this.workspaceCascadeDeleter = workspaceCascadeDeleter;
         this.workspaceMapper = workspaceMapper;
+        this.documentNumberService = documentNumberService;
     }
 
     @Transactional(readOnly = true)
@@ -102,9 +109,46 @@ public class WorkspaceService {
         ws.setCurrencyCode(request.currencyCode().trim().toUpperCase());
         ws.setInvoicePrefix(request.invoicePrefix().trim());
         ws.setQuotationPrefix(request.quotationPrefix().trim());
+        ws.setCreditNotePrefix(blankToDefault(request.creditNotePrefix(), ws.getCreditNotePrefix()));
+        if (request.vatRegime() != null) {
+            ws.setVatRegime(request.vatRegime());
+        }
+        if (request.paymentTermsDays() != null) {
+            ws.setPaymentTermsDays(request.paymentTermsDays());
+        }
+        if (request.latePenaltyRate() != null) {
+            ws.setLatePenaltyRate(request.latePenaltyRate());
+        }
+        if (request.recoveryFeeAmount() != null) {
+            ws.setRecoveryFeeAmount(request.recoveryFeeAmount());
+        }
+        ws.setEarlyPaymentDiscount(trimToNull(request.earlyPaymentDiscount()));
+        ws.setPaymentTermsText(trimToNull(request.paymentTermsText()));
+        ws.setLegalFooterText(trimToNull(request.legalFooterText()));
+        if (request.remindersEnabled() != null) {
+            ws.setRemindersEnabled(request.remindersEnabled());
+        }
+        SequenceReset reset = request.sequenceReset() != null ? request.sequenceReset() : ws.getSequenceReset();
+        String pattern = blankToDefault(request.numberPattern(), ws.getNumberPattern());
+        NumberPattern.validate(pattern, reset);
+        ws.setSequenceReset(reset);
+        ws.setNumberPattern(pattern);
 
         ws = workspaceRepository.save(ws);
         return workspaceMapper.toResponse(ws);
+    }
+
+    @Transactional(readOnly = true)
+    public List<DocumentNumberService.Counter> counters(UUID workspaceId) {
+        UUID tenantId = SecurityContextHelper.requireTenantId();
+        return documentNumberService.counters(tenantAccessService.requireWorkspace(workspaceId, tenantId));
+    }
+
+    @Transactional
+    public DocumentNumberService.Counter setNextNumber(UUID workspaceId, DocumentSequenceType type, long nextValue) {
+        SecurityContextHelper.requireAdminAccess();
+        UUID tenantId = SecurityContextHelper.requireTenantId();
+        return documentNumberService.setNextValue(tenantAccessService.requireWorkspace(workspaceId, tenantId), type, nextValue);
     }
 
     @Transactional

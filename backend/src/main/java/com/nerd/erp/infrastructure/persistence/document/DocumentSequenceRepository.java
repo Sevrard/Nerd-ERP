@@ -14,6 +14,8 @@ import java.util.UUID;
 
 public interface DocumentSequenceRepository extends JpaRepository<DocumentSequence, UUID> {
 
+    Optional<DocumentSequence> findByWorkspaceIdAndSequenceTypeAndYear(UUID workspaceId, DocumentSequenceType type, int year);
+
     /** Verrou pessimiste (SELECT … FOR UPDATE) : sérialise l'attribution des numéros jusqu'au commit. */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT s FROM DocumentSequence s WHERE s.workspaceId = :workspaceId AND s.sequenceType = :type AND s.year = :year")

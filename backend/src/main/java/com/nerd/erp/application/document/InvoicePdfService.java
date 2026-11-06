@@ -44,7 +44,14 @@ public class InvoicePdfService {
         if (invoice.getStatus() == InvoiceStatus.DRAFT && invoice.getIssuedAt() == null) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "Facture non émise");
         }
-        String filename = "facture-" + GeneratedDocument.sanitizeFilename(invoice.getNumber()) + ".pdf";
+        return generate(invoice);
+    }
+
+    /** PDF d'une facture déjà chargée (sans contrôle d'accès supplémentaire : à réserver au code serveur). */
+    @Transactional(readOnly = true)
+    public GeneratedDocument generate(Invoice invoice) {
+        String prefix = invoice.isCreditNote() ? "avoir-" : invoice.isDeposit() ? "facture-acompte-" : "facture-";
+        String filename = prefix + GeneratedDocument.sanitizeFilename(invoice.getNumber()) + ".pdf";
         byte[] stored = documentStorage.readOrNull(invoice.getSourceDocumentPath());
         if (stored != null && stored.length > 0) {
             return new GeneratedDocument(stored, filename);
@@ -52,6 +59,8 @@ public class InvoicePdfService {
         Workspace workspace = workspaceService.requireInTenant(invoice.getWorkspaceId(), invoice.getTenantId());
         Map<UUID, String> skus = skuResolver.resolve(invoice.getTenantId(),
                 invoice.getLines().stream().map(InvoiceLine::getProductId).toList());
-        return new GeneratedDocument(pdfGenerator.generate(invoice, workspace, skus), filename);
+        String creditedNumber = invoiceService.creditedInvoiceNumber(invoice);
+        String depositNumber = invoiceService.depositInvoiceNumber(invoice);
+        return new GeneratedDocument(pdfGenerator.generate(invoice, workspace, skus, creditedNumber, depositNumber), filename);
     }
 }

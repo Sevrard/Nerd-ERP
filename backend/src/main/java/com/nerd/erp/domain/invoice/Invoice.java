@@ -95,12 +95,48 @@ public class Invoice extends TenantScopedEntity {
     @Column(name = "source_document_path", length = 512)
     private String sourceDocumentPath;
 
+    /** Pour un avoir : facture d'origine. */
+    @Column(name = "credited_invoice_id")
+    private UUID creditedInvoiceId;
+
+    @Column(name = "credit_reason", length = 512)
+    private String creditReason;
+
+    /** Facture de solde : facture d'acompte déduite. */
+    @Column(name = "deposit_invoice_id")
+    private UUID depositInvoiceId;
+
+    /** Dernier envoi par e-mail au client. */
+    @Column(name = "sent_at")
+    private Instant sentAt;
+
+    @Column(name = "reminder_count", nullable = false)
+    private int reminderCount = 0;
+
+    @Column(name = "last_reminder_at")
+    private Instant lastReminderAt;
+
     @OneToMany(mappedBy = "invoice", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("lineOrder ASC")
     private List<InvoiceLine> lines = new ArrayList<>();
 
     public boolean isMutableDraft() {
         return status == InvoiceStatus.DRAFT;
+    }
+
+    public boolean isCreditNote() {
+        return invoiceType == InvoiceType.CREDIT_NOTE;
+    }
+
+    public boolean isDeposit() {
+        return invoiceType == InvoiceType.DEPOSIT;
+    }
+
+    /** Reste à payer (TTC - encaissé), jamais négatif. */
+    public BigDecimal remainingAmount() {
+        BigDecimal paid = amountPaid == null ? BigDecimal.ZERO : amountPaid;
+        BigDecimal ttc = totalTtc == null ? BigDecimal.ZERO : totalTtc;
+        return ttc.subtract(paid).max(BigDecimal.ZERO);
     }
 
     public void replaceLines(List<InvoiceLine> newLines) {

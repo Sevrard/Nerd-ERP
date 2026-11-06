@@ -121,7 +121,7 @@ class SalesCycleIntegrationTest extends PostgresIntegrationTest {
                 workspaceId, customerId, LocalDate.now(), LocalDate.now().plusDays(30), "Devis cycle",
                 BigDecimal.ZERO, BigDecimal.ZERO,
                 List.of(new DocumentLineRequest(product.id(), product.name(), new BigDecimal("3"),
-                        product.unitPriceHt(), product.vatRate())));
+                        product.unitPriceHt(), product.vatRate(), null)));
         QuotationResponse draft = restTemplate.postForObject("/api/v1/quotations",
                 new HttpEntity<>(quotationRequest, headers), QuotationResponse.class);
         assertEquals(QuotationStatus.DRAFT, draft.status());

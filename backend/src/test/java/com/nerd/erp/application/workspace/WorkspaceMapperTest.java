@@ -1,10 +1,13 @@
 package com.nerd.erp.application.workspace;
 
 import com.nerd.erp.api.workspace.WorkspaceResponse;
+import com.nerd.erp.domain.workspace.SequenceReset;
+import com.nerd.erp.domain.workspace.VatRegime;
 import com.nerd.erp.domain.workspace.Workspace;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.RecordComponent;
+import java.math.BigDecimal;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -45,6 +48,17 @@ class WorkspaceMapperTest {
         w.setIban("FR7613051492000123456789012");
         w.setBic("NERDFRPPXXX");
         w.setActive(true);
+        w.setCreditNotePrefix("AV");
+        w.setVatRegime(VatRegime.FRANCHISE_293B);
+        w.setPaymentTermsDays(45);
+        w.setLatePenaltyRate(new BigDecimal("10.50"));
+        w.setRecoveryFeeAmount(new BigDecimal("40"));
+        w.setEarlyPaymentDiscount("2 % sous 8 jours");
+        w.setPaymentTermsText("Paiement à réception.");
+        w.setLegalFooterText("RCS Paris 123 456 789");
+        w.setRemindersEnabled(true);
+        w.setNumberPattern("{PREFIX}-{YYYY}{MM}-{SEQ:4}");
+        w.setSequenceReset(SequenceReset.MONTHLY);
 
         WorkspaceResponse response = mapper.toResponse(w);
 
@@ -55,5 +69,8 @@ class WorkspaceMapperTest {
         assertEquals(w.getId(), response.id());
         assertEquals("NERDFRPPXXX", response.bic());
         assertEquals("DEV", response.quotationPrefix());
+        assertEquals(VatRegime.FRANCHISE_293B, response.vatRegime());
+        assertEquals(45, response.paymentTermsDays());
+        assertEquals(SequenceReset.MONTHLY, response.sequenceReset());
     }
 }

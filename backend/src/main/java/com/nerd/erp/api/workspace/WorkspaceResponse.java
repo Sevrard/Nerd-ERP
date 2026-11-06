@@ -1,7 +1,10 @@
 package com.nerd.erp.api.workspace;
 
+import com.nerd.erp.domain.workspace.SequenceReset;
+import com.nerd.erp.domain.workspace.VatRegime;
 import lombok.Builder;
 
+import java.math.BigDecimal;
 import java.util.UUID;
 
 /**
@@ -32,6 +35,17 @@ public record WorkspaceResponse(
         String iban,
         String bic,
         String invoicePrefix,
-        String quotationPrefix
+        String quotationPrefix,
+        String creditNotePrefix,
+        VatRegime vatRegime,
+        int paymentTermsDays,
+        BigDecimal latePenaltyRate,
+        BigDecimal recoveryFeeAmount,
+        String earlyPaymentDiscount,
+        String paymentTermsText,
+        String legalFooterText,
+        boolean remindersEnabled,
+        String numberPattern,
+        SequenceReset sequenceReset
 ) {
 }

@@ -36,6 +36,17 @@ public class WorkspaceMapper {
                 .bic(w.getBic())
                 .invoicePrefix(w.getInvoicePrefix())
                 .quotationPrefix(w.getQuotationPrefix())
+                .creditNotePrefix(w.getCreditNotePrefix())
+                .vatRegime(w.getVatRegime())
+                .paymentTermsDays(w.getPaymentTermsDays())
+                .latePenaltyRate(w.getLatePenaltyRate())
+                .recoveryFeeAmount(w.getRecoveryFeeAmount())
+                .earlyPaymentDiscount(w.getEarlyPaymentDiscount())
+                .paymentTermsText(w.getPaymentTermsText())
+                .legalFooterText(w.getLegalFooterText())
+                .remindersEnabled(w.isRemindersEnabled())
+                .numberPattern(w.getNumberPattern())
+                .sequenceReset(w.getSequenceReset())
                 .build();
     }
 }

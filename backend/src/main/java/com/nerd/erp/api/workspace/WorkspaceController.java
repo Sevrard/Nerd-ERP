@@ -1,8 +1,12 @@
 package com.nerd.erp.api.workspace;
 
+import com.nerd.erp.application.document.DocumentNumberService;
 import com.nerd.erp.application.workspace.WorkspaceService;
+import com.nerd.erp.domain.document.DocumentSequenceType;
 import com.nerd.erp.infrastructure.security.core.RequireAdminAccess;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotNull;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -55,5 +59,23 @@ public class WorkspaceController {
     @RequireAdminAccess
     public void delete(@PathVariable UUID id) {
         workspaceService.delete(id);
+    }
+
+    /** Compteurs de numérotation de la période courante, avec aperçu du prochain numéro. */
+    @GetMapping("/{id}/sequences")
+    public List<DocumentNumberService.Counter> sequences(@PathVariable UUID id) {
+        return workspaceService.counters(id);
+    }
+
+    /** Reprise d'une numérotation existante : fixe le prochain numéro (jamais en arrière). */
+    @PutMapping("/{id}/sequences/{type}")
+    @RequireAdminAccess
+    public DocumentNumberService.Counter setNextNumber(@PathVariable UUID id,
+                                                       @PathVariable DocumentSequenceType type,
+                                                       @Valid @RequestBody SequenceUpdateRequest request) {
+        return workspaceService.setNextNumber(id, type, request.nextValue());
+    }
+
+    public record SequenceUpdateRequest(@NotNull @Min(1) Long nextValue) {
     }
 }

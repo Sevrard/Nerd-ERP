@@ -1,7 +1,12 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { Observable, tap } from 'rxjs';
 import { ApiClient } from '../api/api-client.service';
-import { Workspace, WorkspaceUpdatePayload } from '../../shared/models/workspace.model';
+import {
+  DocumentSequenceType,
+  SequenceCounter,
+  Workspace,
+  WorkspaceUpdatePayload,
+} from '../../shared/models/workspace.model';
 
 const STORAGE_KEY = 'nerd-erp.workspace-id';
 
@@ -65,6 +70,16 @@ export class WorkspaceService {
         );
       }),
     );
+  }
+
+  /** Compteurs de numérotation de la période courante. */
+  sequences(id: string): Observable<SequenceCounter[]> {
+    return this.api.get<SequenceCounter[]>(`/workspaces/${id}/sequences`);
+  }
+
+  /** Fixe le prochain numéro d'une série (admin ; ne peut pas reculer). */
+  setNextNumber(id: string, type: DocumentSequenceType, nextValue: number): Observable<SequenceCounter> {
+    return this.api.put<SequenceCounter>(`/workspaces/${id}/sequences/${type}`, { nextValue });
   }
 
   deleteWorkspace(id: string): Observable<void> {

@@ -2,6 +2,7 @@ package com.nerd.erp.infrastructure.persistence.invoice;
 
 import com.nerd.erp.domain.invoice.Invoice;
 import com.nerd.erp.domain.invoice.InvoiceStatus;
+import com.nerd.erp.domain.invoice.InvoiceType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -10,16 +11,54 @@ import org.springframework.data.repository.query.Param;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 public interface InvoiceRepository extends JpaRepository<Invoice, UUID> {
 
+    boolean existsByTenantIdAndWorkspaceId(UUID tenantId, UUID workspaceId);
+
     Optional<Invoice> findByIdAndTenantId(UUID id, UUID tenantId);
 
     boolean existsByTenantIdAndCustomerId(UUID tenantId, UUID customerId);
 
-    Optional<Invoice> findBySourceQuotationIdAndTenantId(UUID quotationId, UUID tenantId);
+    /** Avoirs émis sur une facture, plus ancien en premier. */
+    List<Invoice> findByTenantIdAndCreditedInvoiceIdOrderByIssueDateAscCreatedAtAsc(UUID tenantId, UUID creditedInvoiceId);
+
+    /** Export comptable : documents émis (hors brouillons) sur une période, par date puis numéro. */
+    @Query("""
+            SELECT i FROM Invoice i
+            WHERE i.tenantId = :tenantId AND i.workspaceId = :workspaceId
+            AND i.status <> 'DRAFT'
+            AND i.issueDate BETWEEN :from AND :to
+            ORDER BY i.issueDate ASC, i.number ASC
+            """)
+    List<Invoice> findForExport(@Param("tenantId") UUID tenantId,
+                                @Param("workspaceId") UUID workspaceId,
+                                @Param("from") LocalDate from,
+                                @Param("to") LocalDate to);
+
+    /**
+     * Factures échues à relancer (toutes locataires confondus, filtrées ensuite sur les workspaces opt-in) :
+     * émises ou partiellement payées, standard, échéance ≤ dueBefore.
+     */
+    @Query("""
+            SELECT i FROM Invoice i
+            WHERE i.status IN ('ISSUED', 'PARTIALLY_PAID')
+            AND i.invoiceType <> 'CREDIT_NOTE'
+            AND i.dueDate <= :dueBefore
+            AND i.reminderCount < :maxReminders
+            """)
+    List<Invoice> findOverdueForReminders(@Param("dueBefore") LocalDate dueBefore,
+                                          @Param("maxReminders") int maxReminders);
+
+    /** Facture d'un type donné issue d'un devis (au plus une facture de solde et une d'acompte par devis). */
+    Optional<Invoice> findFirstByTenantIdAndSourceQuotationIdAndInvoiceTypeOrderByCreatedAtAsc(
+            UUID tenantId, UUID quotationId, InvoiceType invoiceType);
+
+    /** Facture de solde ayant déduit une facture d'acompte. */
+    Optional<Invoice> findFirstByTenantIdAndDepositInvoiceId(UUID tenantId, UUID depositInvoiceId);
 
     Page<Invoice> findByTenantIdAndWorkspaceIdOrderByIssueDateDesc(UUID tenantId, UUID workspaceId, Pageable pageable);
 
@@ -47,7 +86,7 @@ public interface InvoiceRepository extends JpaRepository<Invoice, UUID> {
             AND (:workspaceId IS NULL OR i.workspaceId = :workspaceId)
             AND i.status IN ('ISSUED', 'PARTIALLY_PAID', 'PAID')
             AND i.issueDate BETWEEN :from AND :to
-            AND i.invoiceType = 'STANDARD'
+            AND i.invoiceType <> 'CREDIT_NOTE'
             """)
     BigDecimal sumInvoicedRevenue(@Param("tenantId") UUID tenantId,
                                   @Param("workspaceId") UUID workspaceId,
@@ -59,7 +98,7 @@ public interface InvoiceRepository extends JpaRepository<Invoice, UUID> {
             WHERE i.tenantId = :tenantId
             AND (:workspaceId IS NULL OR i.workspaceId = :workspaceId)
             AND i.status IN ('ISSUED', 'PARTIALLY_PAID', 'PAID')
-            AND i.invoiceType = 'STANDARD'
+            AND i.invoiceType <> 'CREDIT_NOTE'
             """)
     BigDecimal sumInvoicedRevenueAllTime(@Param("tenantId") UUID tenantId,
                                          @Param("workspaceId") UUID workspaceId);
@@ -70,7 +109,7 @@ public interface InvoiceRepository extends JpaRepository<Invoice, UUID> {
             AND (:workspaceId IS NULL OR i.workspaceId = :workspaceId)
             AND i.status IN ('ISSUED', 'PARTIALLY_PAID', 'PAID')
             AND i.issueDate BETWEEN :from AND :to
-            AND i.invoiceType = 'STANDARD'
+            AND i.invoiceType <> 'CREDIT_NOTE'
             """)
     long countInvoicedInvoices(@Param("tenantId") UUID tenantId,
                                @Param("workspaceId") UUID workspaceId,
@@ -82,7 +121,7 @@ public interface InvoiceRepository extends JpaRepository<Invoice, UUID> {
             WHERE i.tenantId = :tenantId
             AND (:workspaceId IS NULL OR i.workspaceId = :workspaceId)
             AND i.status IN ('ISSUED', 'PARTIALLY_PAID', 'PAID')
-            AND i.invoiceType = 'STANDARD'
+            AND i.invoiceType <> 'CREDIT_NOTE'
             """)
     long countInvoicedInvoicesAllTime(@Param("tenantId") UUID tenantId,
                                       @Param("workspaceId") UUID workspaceId);
@@ -92,6 +131,7 @@ public interface InvoiceRepository extends JpaRepository<Invoice, UUID> {
             WHERE i.tenantId = :tenantId
             AND (:workspaceId IS NULL OR i.workspaceId = :workspaceId)
             AND i.status IN ('ISSUED', 'PARTIALLY_PAID')
+            AND i.invoiceType <> 'CREDIT_NOTE'
             AND i.dueDate < :today
             """)
     long countOverdue(@Param("tenantId") UUID tenantId,

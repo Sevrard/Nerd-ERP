@@ -1,5 +1,6 @@
 package com.nerd.erp.api.invoice;
 
+import com.nerd.erp.api.document.VatLineResponse;
 import com.nerd.erp.domain.invoice.InvoiceStatus;
 import com.nerd.erp.domain.invoice.InvoiceType;
 import lombok.Builder;
@@ -37,6 +38,22 @@ public record InvoiceResponse(
         String merchant,
         String orderNumber,
         Instant issuedAt,
+        /** Avoir : facture d'origine. */
+        UUID creditedInvoiceId,
+        String creditedInvoiceNumber,
+        String creditReason,
+        /** Facture : avoirs émis dessus. */
+        List<LinkedDocument> creditNotes,
+        /** Facture de solde : acompte déduit. Facture d'acompte : facture de solde émise ensuite. */
+        LinkedDocument depositInvoice,
+        LinkedDocument balanceInvoice,
+        /** Récapitulatif TVA par taux (net de remise). */
+        List<VatLineResponse> vatBreakdown,
+        Instant sentAt,
+        int reminderCount,
+        Instant lastReminderAt,
         List<InvoiceLineResponse> lines
 ) {
+    public record LinkedDocument(UUID id, String number, BigDecimal totalTtc) {
+    }
 }

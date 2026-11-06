@@ -75,7 +75,7 @@ class QuotationConversionIntegrationTest extends PostgresIntegrationTest {
                 new BigDecimal("10"),
                 new BigDecimal("30"),
                 List.of(new DocumentLineRequest(null, "Prestation", BigDecimal.ONE, new BigDecimal("500"),
-                        new BigDecimal("20"))));
+                        new BigDecimal("20"), null)));
         QuotationResponse draft = restTemplate.postForObject(
                 "/api/v1/quotations", new HttpEntity<>(quotationRequest, headers), QuotationResponse.class);
         restTemplate.postForObject("/api/v1/quotations/" + draft.id() + "/send",

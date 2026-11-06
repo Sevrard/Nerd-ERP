@@ -24,7 +24,14 @@ public final class MoneyCalculator {
     }
 
     public static LineTotals computeLine(BigDecimal quantity, BigDecimal unitPriceHt, BigDecimal vatRate) {
-        BigDecimal ht = lineTotalHt(quantity, unitPriceHt);
+        return computeLine(quantity, unitPriceHt, vatRate, null);
+    }
+
+    /** Totaux d'une ligne après remise de ligne ({@code discountPercent} en % du HT ligne, null = 0). */
+    public static LineTotals computeLine(BigDecimal quantity, BigDecimal unitPriceHt, BigDecimal vatRate,
+                                         BigDecimal discountPercent) {
+        BigDecimal gross = lineTotalHt(quantity, unitPriceHt);
+        BigDecimal ht = gross.subtract(percentOf(gross, discountPercent)).setScale(MONEY_SCALE, ROUNDING);
         BigDecimal vat = lineTotalVat(ht, vatRate);
         BigDecimal ttc = lineTotalTtc(ht, vat);
         return new LineTotals(ht, vat, ttc);
@@ -34,6 +41,40 @@ public final class MoneyCalculator {
     }
 
     public record DocumentTotals(BigDecimal totalHt, BigDecimal totalVat, BigDecimal totalTtc) {
+    }
+
+    /** Ventilation de la TVA par taux : base HT nette et montant de TVA. */
+    public record VatLine(BigDecimal rate, BigDecimal baseHt, BigDecimal vatAmount) {
+    }
+
+    /** Ligne minimale pour la ventilation TVA (taux, HT ligne, TVA ligne). */
+    public record RatedLine(BigDecimal vatRate, BigDecimal lineHt, BigDecimal lineVat) {
+    }
+
+    /**
+     * Récapitulatif TVA par taux (mention obligatoire dès que plusieurs taux coexistent), net de la remise
+     * globale appliquée proportionnellement comme dans {@link #applyDiscount}. Trié par taux croissant.
+     */
+    public static java.util.List<VatLine> vatBreakdown(java.util.Collection<RatedLine> lines, BigDecimal discountPercent) {
+        BigDecimal pct = discountPercent == null || discountPercent.signum() <= 0 ? BigDecimal.ZERO : discountPercent;
+        java.util.TreeMap<BigDecimal, BigDecimal[]> byRate = new java.util.TreeMap<>();
+        for (RatedLine line : lines) {
+            BigDecimal rate = (line.vatRate() == null ? BigDecimal.ZERO : line.vatRate()).setScale(2, ROUNDING);
+            BigDecimal[] acc = byRate.computeIfAbsent(rate, r -> new BigDecimal[]{BigDecimal.ZERO, BigDecimal.ZERO});
+            acc[0] = acc[0].add(line.lineHt() == null ? BigDecimal.ZERO : line.lineHt());
+            acc[1] = acc[1].add(line.lineVat() == null ? BigDecimal.ZERO : line.lineVat());
+        }
+        java.util.List<VatLine> out = new java.util.ArrayList<>();
+        for (var e : byRate.entrySet()) {
+            BigDecimal base = e.getValue()[0];
+            BigDecimal vat = e.getValue()[1];
+            if (pct.signum() > 0) {
+                base = base.subtract(percentOf(base, pct));
+                vat = vat.subtract(percentOf(vat, pct));
+            }
+            out.add(new VatLine(e.getKey(), base.setScale(MONEY_SCALE, ROUNDING), vat.setScale(MONEY_SCALE, ROUNDING)));
+        }
+        return out;
     }
 
     /** Totaux nets après remise globale, avec le montant HT de remise appliqué. */

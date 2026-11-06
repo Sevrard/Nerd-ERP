@@ -108,9 +108,14 @@ public class PaymentService {
             allocation.setAmount(allocReq.amount());
             allocations.add(allocation);
 
+            InvoiceStatus before = invoice.getStatus();
             invoice.setAmountPaid(invoice.getAmountPaid().add(allocReq.amount()));
             updateInvoicePaymentStatus(invoice);
             invoiceRepository.save(invoice);
+            if (before != invoice.getStatus()) {
+                auditService.record(tenantId, "Invoice", invoice.getId(), "STATUS_" + invoice.getStatus().name(),
+                        Map.of("from", before.name(), "amountPaid", invoice.getAmountPaid()));
+            }
         }
         payment.getAllocations().addAll(allocations);
         payment = paymentRepository.save(payment);

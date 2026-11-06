@@ -54,9 +54,9 @@ class DocumentNumberConcurrencyIntegrationTest extends PostgresIntegrationTest {
         ws.setOrganizationId(org.getId());
         ws.setName("Seq " + UUID.randomUUID());
         ws.setSlug("seq-" + UUID.randomUUID().toString().substring(0, 8));
+        ws.setQuotationPrefix("DEV");
         ws = workspaceRepository.save(ws);
-        UUID workspaceId = ws.getId();
-        UUID tenantId = tenant.getId();
+        final Workspace workspace = ws;
 
         ExecutorService pool = Executors.newFixedThreadPool(THREADS);
         CountDownLatch start = new CountDownLatch(1);
@@ -65,7 +65,7 @@ class DocumentNumberConcurrencyIntegrationTest extends PostgresIntegrationTest {
             for (int i = 0; i < THREADS; i++) {
                 Callable<String> task = () -> {
                     start.await(10, TimeUnit.SECONDS);
-                    return documentNumberService.nextNumber(tenantId, workspaceId, DocumentSequenceType.QUOTATION, "DEV");
+                    return documentNumberService.nextNumber(workspace, DocumentSequenceType.QUOTATION);
                 };
                 futures.add(pool.submit(task));
             }

@@ -214,8 +214,7 @@ public class InvoiceScanService {
         invoice.setTotalTtc(totals.totalTtc());
         invoice.setAmountPaid(totals.totalTtc());
 
-        String number = documentNumberService.nextNumber(tenantId, workspace.getId(),
-                DocumentSequenceType.INVOICE, workspace.getInvoicePrefix());
+        String number = documentNumberService.nextNumber(workspace, DocumentSequenceType.INVOICE);
         invoice.setNumber(number);
         invoice.setStatus(InvoiceStatus.PAID);
         invoice.setIssuedAt(Instant.now());

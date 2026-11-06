@@ -9,7 +9,7 @@ import java.util.List;
  * Les services métier construisent ce modèle ; le renderer ne connaît ni JPA ni les DTOs.
  */
 public record PdfDocumentModel(
-        /** Libellé du type : "DEVIS", "FACTURE", "AVOIR". */
+        /** Libellé du type : "DEVIS", "FACTURE", "FACTURE D'ACOMPTE", "AVOIR". */
         String kind,
         String number,
         String statusLabel,
@@ -34,7 +34,22 @@ public record PdfDocumentModel(
     }
 
     public record Line(String sku, String label, String detail, BigDecimal quantity, String unit,
-                       BigDecimal unitPriceHt, BigDecimal vatRate, BigDecimal lineTotalHt) {
+                       BigDecimal unitPriceHt, BigDecimal vatRate, BigDecimal lineTotalHt,
+                       /** Remise de ligne en % (null ou 0 = aucune). */
+                       BigDecimal discountPercent) {
+
+        public Line(String sku, String label, String detail, BigDecimal quantity, String unit,
+                    BigDecimal unitPriceHt, BigDecimal vatRate, BigDecimal lineTotalHt) {
+            this(sku, label, detail, quantity, unit, unitPriceHt, vatRate, lineTotalHt, null);
+        }
+
+        public boolean hasDiscount() {
+            return discountPercent != null && discountPercent.signum() > 0;
+        }
+    }
+
+    /** Ventilation de la TVA par taux. */
+    public record VatLine(BigDecimal rate, BigDecimal baseHt, BigDecimal vatAmount) {
     }
 
     public record Totals(BigDecimal subtotalHt,
@@ -47,7 +62,16 @@ public record PdfDocumentModel(
                          BigDecimal depositPercent,
                          BigDecimal depositAmountTtc,
                          /** Déjà réglé (facture) ; null si non applicable. */
-                         BigDecimal amountPaid) {
+                         BigDecimal amountPaid,
+                         /** Récapitulatif TVA par taux ; vide = ligne « TVA » unique. */
+                         List<VatLine> vatLines) {
+
+        public Totals(BigDecimal subtotalHt, BigDecimal discountPercent, BigDecimal discountAmountHt,
+                      BigDecimal totalHt, BigDecimal totalVat, BigDecimal totalTtc, BigDecimal depositPercent,
+                      BigDecimal depositAmountTtc, BigDecimal amountPaid) {
+            this(subtotalHt, discountPercent, discountAmountHt, totalHt, totalVat, totalTtc, depositPercent,
+                    depositAmountTtc, amountPaid, List.of());
+        }
 
         public boolean hasDiscount() {
             return discountAmountHt != null && discountAmountHt.signum() > 0;

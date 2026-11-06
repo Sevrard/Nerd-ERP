@@ -1,18 +1,45 @@
 package com.nerd.erp.application.document.pdf;
 
+import com.nerd.erp.application.money.MoneyCalculator;
 import com.nerd.erp.domain.workspace.Workspace;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.List;
 
 /** Éléments communs devis / facture : pied de page légal, coordonnées bancaires, objet. */
 final class DocumentPdfSupport {
 
-    static final String LATE_PAYMENT_NOTICE =
-            "Escompte pour paiement anticipé : néant. En cas de retard de paiement, pénalités au taux annuel de 12 % "
-                    + "et indemnité forfaitaire pour frais de recouvrement de 40 €.";
-
     private DocumentPdfSupport() {
+    }
+
+    /**
+     * Mentions obligatoires (art. L441-10 C. com.) construites depuis les paramètres du workspace :
+     * escompte, pénalités de retard, indemnité forfaitaire de recouvrement, régime de TVA, texte libre.
+     */
+    static String legalNotice(Workspace w) {
+        List<String> parts = new ArrayList<>();
+        String discount = w.getEarlyPaymentDiscount();
+        parts.add("Escompte pour paiement anticipé : " + (discount == null || discount.isBlank() ? "néant" : discount.trim()) + ".");
+        BigDecimal rate = w.getLatePenaltyRate() == null ? new BigDecimal("12") : w.getLatePenaltyRate();
+        BigDecimal fee = w.getRecoveryFeeAmount() == null ? new BigDecimal("40") : w.getRecoveryFeeAmount();
+        parts.add("En cas de retard de paiement, pénalités au taux annuel de " + plain(rate)
+                + " % et indemnité forfaitaire pour frais de recouvrement de " + plain(fee) + " €.");
+        String vat = w.getVatRegime() == null ? null : w.getVatRegime().legalMention();
+        if (vat != null) {
+            parts.add(vat);
+        }
+        if (w.getLegalFooterText() != null && !w.getLegalFooterText().isBlank()) {
+            parts.add(w.getLegalFooterText().trim());
+        }
+        return String.join(" ", parts);
+    }
+
+    private static String plain(BigDecimal value) {
+        return value.stripTrailingZeros().scale() <= 0
+                ? value.stripTrailingZeros().toPlainString()
+                : value.setScale(2, RoundingMode.HALF_UP).toPlainString().replace('.', ',');
     }
 
     static List<String> footerLines(Workspace w) {
@@ -34,12 +61,18 @@ final class DocumentPdfSupport {
         }
         List<String> lines = new ArrayList<>();
         lines.add(String.join(" - ", parts));
-        lines.add(LATE_PAYMENT_NOTICE);
+        lines.add(legalNotice(w));
         return lines;
     }
 
     static PdfDocumentModel.BankDetails bank(Workspace w) {
         return new PdfDocumentModel.BankDetails(w.getName(), w.getIban(), w.getBic());
+    }
+
+    static List<PdfDocumentModel.VatLine> vatLines(List<MoneyCalculator.VatLine> breakdown) {
+        return breakdown.stream()
+                .map(v -> new PdfDocumentModel.VatLine(v.rate(), v.baseHt(), v.vatAmount()))
+                .toList();
     }
 
     /** 1re ligne des notes = objet, le reste = résumé (même convention que l'aperçu frontend). */

@@ -49,6 +49,10 @@ public class QuotationLine {
     @Column(name = "vat_rate", nullable = false, precision = 5, scale = 2)
     private BigDecimal vatRate;
 
+    /** Remise commerciale sur la ligne (% du HT ligne), 0 = aucune. */
+    @Column(name = "discount_percent", nullable = false, precision = 5, scale = 2)
+    private BigDecimal discountPercent = BigDecimal.ZERO;
+
     @Column(name = "line_total_ht", nullable = false, precision = 19, scale = 4)
     private BigDecimal lineTotalHt;
 

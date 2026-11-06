@@ -11,6 +11,7 @@ public record QuotationLineResponse(
         BigDecimal quantity,
         BigDecimal unitPriceHt,
         BigDecimal vatRate,
+        BigDecimal discountPercent,
         BigDecimal lineTotalHt,
         BigDecimal lineTotalVat,
         BigDecimal lineTotalTtc

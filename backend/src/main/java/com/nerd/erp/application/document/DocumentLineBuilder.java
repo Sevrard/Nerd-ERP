@@ -15,7 +15,17 @@ public final class DocumentLineBuilder {
     }
 
     public record LineInput(UUID productId, String description, BigDecimal quantity, BigDecimal unitPriceHt,
-                            BigDecimal vatRate) {
+                            BigDecimal vatRate, BigDecimal discountPercent) {
+
+        /** Ligne sans remise. */
+        public LineInput(UUID productId, String description, BigDecimal quantity, BigDecimal unitPriceHt,
+                         BigDecimal vatRate) {
+            this(productId, description, quantity, unitPriceHt, vatRate, null);
+        }
+
+        public BigDecimal discountOrZero() {
+            return discountPercent == null ? BigDecimal.ZERO : discountPercent;
+        }
     }
 
     public static List<QuotationLine> buildQuotationLines(UUID tenantId, List<LineInput> inputs) {
@@ -23,7 +33,7 @@ public final class DocumentLineBuilder {
         int order = 0;
         for (LineInput input : inputs) {
             MoneyCalculator.LineTotals totals = MoneyCalculator.computeLine(
-                    input.quantity(), input.unitPriceHt(), input.vatRate());
+                    input.quantity(), input.unitPriceHt(), input.vatRate(), input.discountPercent());
             QuotationLine line = new QuotationLine();
             line.setTenantId(tenantId);
             line.setProductId(input.productId());
@@ -32,6 +42,7 @@ public final class DocumentLineBuilder {
             line.setQuantity(input.quantity());
             line.setUnitPriceHt(input.unitPriceHt());
             line.setVatRate(input.vatRate());
+            line.setDiscountPercent(input.discountOrZero());
             line.setLineTotalHt(totals.totalHt());
             line.setLineTotalVat(totals.totalVat());
             line.setLineTotalTtc(totals.totalTtc());
@@ -45,7 +56,7 @@ public final class DocumentLineBuilder {
         int order = 0;
         for (LineInput input : inputs) {
             MoneyCalculator.LineTotals totals = MoneyCalculator.computeLine(
-                    input.quantity(), input.unitPriceHt(), input.vatRate());
+                    input.quantity(), input.unitPriceHt(), input.vatRate(), input.discountPercent());
             InvoiceLine line = new InvoiceLine();
             line.setTenantId(tenantId);
             line.setProductId(input.productId());
@@ -54,6 +65,7 @@ public final class DocumentLineBuilder {
             line.setQuantity(input.quantity());
             line.setUnitPriceHt(input.unitPriceHt());
             line.setVatRate(input.vatRate());
+            line.setDiscountPercent(input.discountOrZero());
             line.setLineTotalHt(totals.totalHt());
             line.setLineTotalVat(totals.totalVat());
             line.setLineTotalTtc(totals.totalTtc());
@@ -72,5 +84,19 @@ public final class DocumentLineBuilder {
         return MoneyCalculator.sumLines(lines.stream()
                 .map(l -> new MoneyCalculator.LineTotals(l.getLineTotalHt(), l.getLineTotalVat(), l.getLineTotalTtc()))
                 .toList());
+    }
+
+    /** Ventilation TVA d'un devis, nette de sa remise globale. */
+    public static List<MoneyCalculator.VatLine> vatBreakdown(List<QuotationLine> lines, BigDecimal discountPercent) {
+        return MoneyCalculator.vatBreakdown(lines.stream()
+                .map(l -> new MoneyCalculator.RatedLine(l.getVatRate(), l.getLineTotalHt(), l.getLineTotalVat()))
+                .toList(), discountPercent);
+    }
+
+    /** Ventilation TVA d'une facture, nette de sa remise globale. */
+    public static List<MoneyCalculator.VatLine> vatBreakdownOfInvoice(List<InvoiceLine> lines, BigDecimal discountPercent) {
+        return MoneyCalculator.vatBreakdown(lines.stream()
+                .map(l -> new MoneyCalculator.RatedLine(l.getVatRate(), l.getLineTotalHt(), l.getLineTotalVat()))
+                .toList(), discountPercent);
     }
 }

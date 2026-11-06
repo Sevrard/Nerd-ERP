@@ -10,6 +10,7 @@ public record InvoiceLineResponse(
         BigDecimal quantity,
         BigDecimal unitPriceHt,
         BigDecimal vatRate,
+        BigDecimal discountPercent,
         BigDecimal lineTotalHt,
         BigDecimal lineTotalVat,
         BigDecimal lineTotalTtc,

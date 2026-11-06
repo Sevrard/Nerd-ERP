@@ -51,6 +51,10 @@ nerd:
     secrets-key: ${MAIL_SECRETS_KEY:}
     # URL publique du frontend, utilisée dans les liens des e-mails.
     app-base-url: ${APP_BASE_URL:http://localhost:4200}
+  reminders:
+    # Relances automatiques des factures échues (J+7, J+15) pour les workspaces qui les ont activées.
+    enabled: ${REMINDERS_ENABLED:true}
+    cron: ${REMINDERS_CRON:0 0 8 * * *}
   bootstrap:
     enabled: ${BOOTSTRAP_ENABLED:true}
     admin-email: ${BOOTSTRAP_ADMIN_EMAIL:admin@nerd.local}
