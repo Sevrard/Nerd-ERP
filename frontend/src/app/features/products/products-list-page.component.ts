@@ -3,7 +3,9 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { catchError, debounceTime, distinctUntilChanged, forkJoin, of, Subject } from 'rxjs';
+import { AuthService } from '../../core/auth/auth.service';
 import { WorkspaceService } from '../../core/workspace/workspace.service';
+import { CsvImportDialogComponent } from '../../shared/ui/csv-import-dialog.component';
 import { sortParam } from '../../shared/models/page.model';
 import { BillingType, Product, ProductStats } from '../../shared/models/product.model';
 import { EmptyStateComponent } from '../../shared/ui/empty-state.component';
@@ -89,11 +91,13 @@ interface ProductInlineDraft {
     SortableThComponent,
     PaginatorComponent,
     SearchSelectComponent,
+    CsvImportDialogComponent,
   ],
   templateUrl: './products-list-page.component.html',
 })
 export class ProductsListPageComponent implements OnInit {
   private readonly api = inject(ProductsApiService);
+  readonly auth = inject(AuthService);
   private readonly categoriesApi = inject(ProductCategoriesApiService);
   private readonly packagesApi = inject(CatalogPackagesApiService);
   readonly workspaces = inject(WorkspaceService);
@@ -229,6 +233,18 @@ export class ProductsListPageComponent implements OnInit {
 
   setTab(tab: CatalogTab): void {
     this.activeTab.set(tab);
+  }
+
+  readonly importOpen = signal(false);
+  readonly importProducts = (workspaceId: string, file: File, dryRun: boolean) =>
+    this.api.importCsv(workspaceId, file, dryRun);
+  readonly importTemplate = () => this.api.importTemplate();
+
+  onImported(): void {
+    this.importOpen.set(false);
+    this.page.reset();
+    this.loadCategories();
+    this.reloadProducts();
   }
 
   onProductSort(key: string): void {

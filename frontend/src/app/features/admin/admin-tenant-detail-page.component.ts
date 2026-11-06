@@ -91,6 +91,68 @@ interface ModuleDraft {
               <dt class="text-slate-500">Dernière modification</dt>
               <dd class="text-white">{{ t.updatedAt | date: 'dd/MM/yyyy HH:mm' }}</dd>
             </dl>
+
+            <h3 class="mt-6 text-sm font-semibold text-white">Écran de connexion</h3>
+            <p class="mt-1 text-xs text-slate-500">
+              Visible sur <code class="text-slate-400">/login?tenant={{ t.slug }}</code> et dès que le compte est saisi.
+            </p>
+            <form class="mt-3 space-y-3" [formGroup]="brandingForm" (ngSubmit)="saveBranding()">
+              <div class="grid gap-3 sm:grid-cols-[auto_1fr]">
+                <label class="block text-sm text-slate-300">
+                  Couleur
+                  <div class="mt-1 flex items-center gap-2">
+                    <input
+                      type="color"
+                      class="h-9 w-12 cursor-pointer rounded border border-slate-700 bg-slate-950"
+                      [value]="brandingForm.controls.brandColor.value || '#2563eb'"
+                      (input)="brandingForm.controls.brandColor.setValue($any($event.target).value); brandingForm.markAsDirty()"
+                    />
+                    <input
+                      formControlName="brandColor"
+                      placeholder="#2563eb"
+                      maxlength="7"
+                      class="w-28 rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 font-mono text-sm text-white"
+                    />
+                  </div>
+                </label>
+                <label class="block text-sm text-slate-300">
+                  Logo (URL https)
+                  <input
+                    formControlName="logoUrl"
+                    type="url"
+                    placeholder="https://…/logo.png"
+                    class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-white"
+                  />
+                </label>
+              </div>
+              <label class="block text-sm text-slate-300">
+                Accroche
+                <input
+                  formControlName="loginTagline"
+                  maxlength="255"
+                  placeholder="Bienvenue sur votre espace de gestion"
+                  class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-white"
+                />
+              </label>
+              @if (brandingForm.controls.brandColor.invalid) {
+                <p class="text-xs text-red-400">Couleur attendue au format #rrggbb.</p>
+              }
+              @if (brandingForm.controls.logoUrl.invalid) {
+                <p class="text-xs text-red-400">Le logo doit être une URL https.</p>
+              }
+              <div class="flex items-center justify-end gap-3">
+                @if (brandingSaved()) {
+                  <span class="text-xs text-emerald-300">Habillage enregistré</span>
+                }
+                <button
+                  type="submit"
+                  class="rounded-lg bg-slate-800 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-50"
+                  [disabled]="busy() || brandingForm.invalid || brandingForm.pristine"
+                >
+                  Enregistrer l'habillage
+                </button>
+              </div>
+            </form>
           </section>
 
           <section class="rounded-xl border border-slate-800 bg-slate-900/50 p-6">
@@ -152,7 +214,7 @@ interface ModuleDraft {
             </div>
           }
 
-          <div class="mt-4 overflow-hidden rounded-xl border border-slate-800">
+          <div class="mt-4 overflow-x-auto rounded-xl border border-slate-800">
             <table class="min-w-full divide-y divide-slate-800 text-sm">
               <thead class="bg-slate-900/80 text-left text-xs uppercase text-slate-500">
                 <tr>
@@ -267,6 +329,12 @@ export class AdminTenantDetailPageComponent {
   readonly nameForm = this.fb.nonNullable.group({
     name: ['', [Validators.required, Validators.maxLength(255)]],
   });
+  readonly brandingSaved = signal(false);
+  readonly brandingForm = this.fb.nonNullable.group({
+    brandColor: ['', Validators.pattern(/^$|^#[0-9a-fA-F]{6}$/)],
+    logoUrl: ['', [Validators.pattern(/^$|^https:\/\/.+/), Validators.maxLength(1024)]],
+    loginTagline: ['', Validators.maxLength(255)],
+  });
   readonly userForm = this.fb.nonNullable.group({
     email: ['', [Validators.required, Validators.email]],
     displayName: [''],
@@ -343,6 +411,23 @@ export class AdminTenantDetailPageComponent {
     this.run(this.api.updateTenant(t.id, { name: this.nameForm.getRawValue().name.trim() }));
   }
 
+  saveBranding(): void {
+    const t = this.tenant();
+    if (!t || this.busy() || this.brandingForm.invalid) {
+      return;
+    }
+    const v = this.brandingForm.getRawValue();
+    this.brandingSaved.set(false);
+    this.run(
+      this.api.updateTenant(t.id, {
+        brandColor: v.brandColor.trim(),
+        logoUrl: v.logoUrl.trim(),
+        loginTagline: v.loginTagline.trim(),
+      }),
+      () => this.brandingSaved.set(true),
+    );
+  }
+
   addUser(): void {
     const t = this.tenant();
     if (!t || this.busy() || this.userForm.invalid) {
@@ -398,6 +483,11 @@ export class AdminTenantDetailPageComponent {
   private apply(t: AdminTenantDetail): void {
     this.tenant.set(t);
     this.nameForm.reset({ name: t.name });
+    this.brandingForm.reset({
+      brandColor: t.brandColor ?? '',
+      logoUrl: t.logoUrl ?? '',
+      loginTagline: t.loginTagline ?? '',
+    });
     this.moduleDrafts.set(
       MODULES.map((m) => {
         const st = t.modules.find((x) => x.code === m.code);

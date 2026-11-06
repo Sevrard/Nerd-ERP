@@ -54,6 +54,10 @@ export interface AdminTenantDetail {
   workspaceCount: number;
   users: AdminTenantUser[];
   modules: AdminTenantModuleState[];
+  /** Habillage de l'écran de connexion (null = thème par défaut). */
+  brandColor: string | null;
+  logoUrl: string | null;
+  loginTagline: string | null;
   /** Renseigné uniquement après une création / un ajout d'utilisateur par invitation. */
   invitation: AdminInvitation | null;
 }
@@ -72,6 +76,10 @@ export interface AdminTenantCreatePayload {
 export interface AdminTenantUpdatePayload {
   name?: string;
   active?: boolean;
+  /** Chaîne vide = effacer ; `undefined` = inchangé. */
+  brandColor?: string;
+  logoUrl?: string;
+  loginTagline?: string;
 }
 
 export interface AdminModuleUpdate {

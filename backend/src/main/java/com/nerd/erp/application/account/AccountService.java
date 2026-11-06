@@ -5,6 +5,8 @@ import com.nerd.erp.api.account.AccountDtos.ChangePasswordRequest;
 import com.nerd.erp.api.account.AccountDtos.ProfileResponse;
 import com.nerd.erp.api.account.AccountDtos.ProfileUpdateRequest;
 import com.nerd.erp.api.account.AccountDtos.ResetPasswordRequest;
+import com.nerd.erp.api.account.AccountDtos.LoginBrandingResponse;
+import com.nerd.erp.api.account.AccountDtos.TermsStatusResponse;
 import com.nerd.erp.api.account.AccountDtos.TokenInfoResponse;
 import com.nerd.erp.api.auth.LoginResponse;
 import com.nerd.erp.api.error.ApiException;
@@ -172,6 +174,41 @@ public class AccountService {
         user.setPasswordHash(passwordEncoder.encode(request.newPassword()));
         user.setPasswordSet(true);
         appUserRepository.save(user);
+    }
+
+    /** Branding public d'un tenant actif ; réponse neutre (sans nom) si slug absent, inconnu ou inactif. */
+    @Transactional(readOnly = true)
+    public LoginBrandingResponse loginBranding(String slug) {
+        if (slug == null || slug.isBlank()) {
+            return new LoginBrandingResponse(null, null, null, null, null);
+        }
+        return tenantRepository.findBySlug(slug.trim().toLowerCase(java.util.Locale.ROOT))
+                .filter(Tenant::isActive)
+                .map(t -> new LoginBrandingResponse(t.getSlug(), t.getName(), t.getBrandColor(), t.getLogoUrl(),
+                        t.getLoginTagline()))
+                .orElseGet(() -> new LoginBrandingResponse(null, null, null, null, null));
+    }
+
+    /** Enregistre l'acceptation de la version courante des CGU/CGV (idempotent). */
+    @Transactional
+    public TermsStatusResponse acceptTerms() {
+        AppUser user = requireCurrentUser();
+        if (!TermsPolicy.accepted(user.getTermsVersion())) {
+            user.setTermsVersion(TermsPolicy.CURRENT_VERSION);
+            user.setTermsAcceptedAt(Instant.now());
+            appUserRepository.save(user);
+        }
+        return termsStatus(user);
+    }
+
+    @Transactional(readOnly = true)
+    public TermsStatusResponse termsStatus() {
+        return termsStatus(requireCurrentUser());
+    }
+
+    private static TermsStatusResponse termsStatus(AppUser user) {
+        return new TermsStatusResponse(TermsPolicy.CURRENT_VERSION, user.getTermsVersion(),
+                user.getTermsAcceptedAt(), TermsPolicy.accepted(user.getTermsVersion()));
     }
 
     private AppUser requireCurrentUser() {

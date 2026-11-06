@@ -29,4 +29,16 @@ public class Tenant extends AuditableEntity {
 
     @Column(nullable = false)
     private boolean active = true;
+
+    // --- Identité visuelle de l'écran de connexion (exposée publiquement par slug) ---
+
+    /** Couleur d'accent au format #RRGGBB. */
+    @Column(name = "brand_color", length = 7)
+    private String brandColor;
+
+    @Column(name = "logo_url", length = 2048)
+    private String logoUrl;
+
+    @Column(name = "login_tagline", length = 255)
+    private String loginTagline;
 }

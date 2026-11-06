@@ -41,4 +41,6 @@ export interface MeResponse {
   platformAdmin: boolean;
   modules: ModuleCode[];
   workspaces: import('./workspace.model').Workspace[];
+  /** Absent juste après le login (profil minimal) ; renseigné par `/auth/me`. */
+  terms?: import('./onboarding.model').TermsStatus;
 }

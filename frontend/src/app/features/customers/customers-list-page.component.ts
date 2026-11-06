@@ -3,7 +3,9 @@ import { Component, DestroyRef, effect, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { RouterLink } from '@angular/router';
 import { debounceTime, distinctUntilChanged, Subject } from 'rxjs';
+import { AuthService } from '../../core/auth/auth.service';
 import { WorkspaceService } from '../../core/workspace/workspace.service';
+import { CsvImportDialogComponent } from '../../shared/ui/csv-import-dialog.component';
 import {
   Customer,
   CustomerPayload,
@@ -60,11 +62,24 @@ interface CustomerInlineDraft {
     LucideIconComponent,
     SortableThComponent,
     PaginatorComponent,
+    CsvImportDialogComponent,
   ],
   templateUrl: './customers-list-page.component.html',
 })
 export class CustomersListPageComponent {
   private readonly api = inject(CustomersApiService);
+  readonly auth = inject(AuthService);
+
+  readonly importOpen = signal(false);
+  readonly importCustomers = (workspaceId: string, file: File, dryRun: boolean) =>
+    this.api.importCsv(workspaceId, file, dryRun);
+  readonly importTemplate = () => this.api.importTemplate();
+
+  onImported(): void {
+    this.importOpen.set(false);
+    this.page.reset();
+    this.reloadAll();
+  }
   private readonly workspaces = inject(WorkspaceService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly searchInput$ = new Subject<string>();

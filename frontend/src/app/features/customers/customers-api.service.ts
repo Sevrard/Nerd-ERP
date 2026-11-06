@@ -10,6 +10,7 @@ import {
   FollowUp,
   FollowUpPayload,
 } from '../../shared/models/customer.model';
+import { CsvImportResult } from '../../shared/models/onboarding.model';
 import { PageQuery, PageResponse } from '../../shared/models/page.model';
 
 @Injectable({ providedIn: 'root' })
@@ -60,5 +61,15 @@ export class CustomersApiService {
 
   scheduleFollowUp(id: string, payload: FollowUpPayload): Observable<FollowUp> {
     return this.api.post<FollowUp>(`/customers/${id}/follow-ups`, payload);
+  }
+
+  importCsv(workspaceId: string, file: File, dryRun: boolean): Observable<CsvImportResult> {
+    const form = new FormData();
+    form.append('file', file, file.name);
+    return this.api.upload<CsvImportResult>('/customers/import', form, { workspaceId, dryRun });
+  }
+
+  importTemplate(): Observable<Blob> {
+    return this.api.download('/customers/import/template');
   }
 }

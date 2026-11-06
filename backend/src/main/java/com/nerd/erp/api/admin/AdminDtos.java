@@ -6,6 +6,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 import java.time.Instant;
@@ -76,12 +77,15 @@ public final class AdminDtos {
             long workspaceCount,
             List<TenantUser> users,
             List<TenantModuleState> modules,
+            String brandColor,
+            String logoUrl,
+            String loginTagline,
             /** Renseigné uniquement en réponse à une création de tenant / ajout d'utilisateur par invitation. */
             Invitation invitation
     ) {
         public TenantDetail withInvitation(Invitation invitation) {
             return new TenantDetail(id, name, slug, active, createdAt, updatedAt, workspaceCount, users, modules,
-                    invitation);
+                    brandColor, logoUrl, loginTagline, invitation);
         }
     }
 
@@ -100,7 +104,11 @@ public final class AdminDtos {
 
     public record TenantUpdateRequest(
             @Size(max = 255) String name,
-            Boolean active
+            Boolean active,
+            // --- Identité visuelle de l'écran de connexion (optionnels ; chaîne vide = effacer) ---
+            @Pattern(regexp = "^$|^#[0-9a-fA-F]{6}$", message = "Couleur attendue au format #RRGGBB") String brandColor,
+            @Size(max = 2048) @Pattern(regexp = "^$|^https://.*", message = "URL de logo en https:// attendue") String logoUrl,
+            @Size(max = 255) String loginTagline
     ) {
     }
 

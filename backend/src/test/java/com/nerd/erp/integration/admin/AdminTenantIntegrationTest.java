@@ -132,7 +132,7 @@ class AdminTenantIntegrationTest extends PostgresIntegrationTest {
 
         // Suspension : le JWT du client reste valide mais toute requête est refusée, et le login échoue.
         TenantDetail suspended = restTemplate.exchange("/api/v1/admin/tenants/" + tenant.id(), HttpMethod.PATCH,
-                new HttpEntity<>(new TenantUpdateRequest(null, false), bearer(adminToken)), TenantDetail.class)
+                new HttpEntity<>(new TenantUpdateRequest(null, false, null, null, null), bearer(adminToken)), TenantDetail.class)
                 .getBody();
         assertNotNull(suspended);
         assertFalse(suspended.active());
@@ -147,7 +147,7 @@ class AdminTenantIntegrationTest extends PostgresIntegrationTest {
         // L'éditeur ne peut pas suspendre son propre tenant.
         UUID adminTenantId = UUID.fromString((String) adminMe.get("tenantId"));
         ResponseEntity<String> selfSuspend = restTemplate.exchange("/api/v1/admin/tenants/" + adminTenantId,
-                HttpMethod.PATCH, new HttpEntity<>(new TenantUpdateRequest(null, false), bearer(adminToken)),
+                HttpMethod.PATCH, new HttpEntity<>(new TenantUpdateRequest(null, false, null, null, null), bearer(adminToken)),
                 String.class);
         assertEquals(HttpStatus.BAD_REQUEST, selfSuspend.getStatusCode());
     }

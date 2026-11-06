@@ -1,6 +1,7 @@
 import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 import { ApiClient } from '../../core/api/api-client.service';
+import { CsvImportResult } from '../../shared/models/onboarding.model';
 import { PageQuery, PageResponse } from '../../shared/models/page.model';
 import { Product, ProductPayload, ProductStats } from '../../shared/models/product.model';
 
@@ -41,5 +42,15 @@ export class ProductsApiService {
 
   delete(id: string): Observable<void> {
     return this.api.delete(`/products/${id}`);
+  }
+
+  importCsv(workspaceId: string, file: File, dryRun: boolean): Observable<CsvImportResult> {
+    const form = new FormData();
+    form.append('file', file, file.name);
+    return this.api.upload<CsvImportResult>('/products/import', form, { workspaceId, dryRun });
+  }
+
+  importTemplate(): Observable<Blob> {
+    return this.api.download('/products/import/template');
   }
 }

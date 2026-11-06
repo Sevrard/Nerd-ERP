@@ -25,11 +25,32 @@ export const routes: Routes = [
       import('./features/auth/activate-page.component').then((m) => m.ActivatePageComponent),
   },
   {
+    // Lien public d'acceptation d'un devis (sans session, jeton signé dans l'URL).
+    path: 'q/:token',
+    loadComponent: () =>
+      import('./features/public/public-quotation-page.component').then((m) => m.PublicQuotationPageComponent),
+  },
+  {
+    // Pages légales publiques (liées depuis la connexion et la modale d'acceptation des CGU).
+    path: 'legal/cgu',
+    data: { kind: 'cgu' },
+    loadComponent: () => import('./features/legal/legal-page.component').then((m) => m.LegalPageComponent),
+  },
+  {
+    path: 'legal/cgv',
+    data: { kind: 'cgv' },
+    loadComponent: () => import('./features/legal/legal-page.component').then((m) => m.LegalPageComponent),
+  },
+  {
     path: '',
     component: MainLayoutComponent,
     canActivate: [authGuard],
     children: [
       { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
+      {
+        path: 'help',
+        loadComponent: () => import('./features/help/help-page.component').then((m) => m.HelpPageComponent),
+      },
       {
         path: 'dashboard',
         loadComponent: () =>

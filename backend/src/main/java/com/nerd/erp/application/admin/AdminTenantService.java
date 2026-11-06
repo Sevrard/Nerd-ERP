@@ -48,6 +48,7 @@ import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -191,6 +192,15 @@ public class AdminTenantService {
             tenant.setActive(request.active());
             tenantStatusService.invalidate(tenantId);
         }
+        if (request.brandColor() != null) {
+            tenant.setBrandColor(request.brandColor().isBlank() ? null : request.brandColor().toLowerCase(Locale.ROOT));
+        }
+        if (request.logoUrl() != null) {
+            tenant.setLogoUrl(request.logoUrl().isBlank() ? null : request.logoUrl().trim());
+        }
+        if (request.loginTagline() != null) {
+            tenant.setLoginTagline(request.loginTagline().isBlank() ? null : request.loginTagline().trim());
+        }
         return toDetail(tenantRepository.save(tenant));
     }
 
@@ -286,7 +296,7 @@ public class AdminTenantService {
                 tenant.getId(), tenant.getName(), tenant.getSlug(), tenant.isActive(),
                 tenant.getCreatedAt(), tenant.getUpdatedAt(),
                 workspaceRepository.countByTenantIdAndActiveTrue(tenant.getId()),
-                tenantUsers, modules, null);
+                tenantUsers, modules, tenant.getBrandColor(), tenant.getLogoUrl(), tenant.getLoginTagline(), null);
     }
 
     private static String resolveSlug(String requested, String name) {

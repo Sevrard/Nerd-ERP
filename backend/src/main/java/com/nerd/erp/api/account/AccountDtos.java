@@ -51,4 +51,14 @@ public final class AccountDtos {
             @NotBlank @Size(min = 8, max = 128) String newPassword
     ) {
     }
+
+    /** État d'acceptation des CGU/CGV : {@code accepted} est faux si la version courante n'a pas été acceptée. */
+    public record TermsStatusResponse(String currentVersion, String acceptedVersion, Instant acceptedAt,
+                                      boolean accepted) {
+    }
+
+    /** Identité visuelle publique d'un compte client pour l'écran de connexion. */
+    public record LoginBrandingResponse(String tenantSlug, String tenantName, String brandColor, String logoUrl,
+                                        String tagline) {
+    }
 }

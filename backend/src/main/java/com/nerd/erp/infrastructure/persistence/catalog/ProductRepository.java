@@ -14,6 +14,8 @@ import java.util.UUID;
 
 public interface ProductRepository extends JpaRepository<Product, UUID> {
 
+    boolean existsByTenantIdAndWorkspaceId(UUID tenantId, UUID workspaceId);
+
     Optional<Product> findByIdAndTenantId(UUID id, UUID tenantId);
 
     Optional<Product> findByTenantIdAndWorkspaceIdAndNameIgnoreCase(

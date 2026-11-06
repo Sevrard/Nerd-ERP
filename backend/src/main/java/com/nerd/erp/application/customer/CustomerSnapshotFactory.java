@@ -12,16 +12,20 @@ public final class CustomerSnapshotFactory {
     private CustomerSnapshotFactory() {
     }
 
+    /** Libellé d'affichage : raison sociale pour une société, « Prénom Nom » pour un particulier. */
+    public static String displayName(Customer customer) {
+        if (customer.getCustomerType() == CustomerType.COMPANY) {
+            return customer.getCompanyName();
+        }
+        return ((customer.getFirstName() != null ? customer.getFirstName() : "") + " "
+                + (customer.getLastName() != null ? customer.getLastName() : "")).trim();
+    }
+
     public static Map<String, Object> fromCustomer(Customer customer) {
         Map<String, Object> snapshot = new LinkedHashMap<>();
         snapshot.put("customerId", customer.getId().toString());
         snapshot.put("customerType", customer.getCustomerType().name());
-        if (customer.getCustomerType() == CustomerType.COMPANY) {
-            snapshot.put("displayName", customer.getCompanyName());
-        } else {
-            snapshot.put("displayName", ((customer.getFirstName() != null ? customer.getFirstName() : "") + " "
-                    + (customer.getLastName() != null ? customer.getLastName() : "")).trim());
-        }
+        snapshot.put("displayName", displayName(customer));
         snapshot.put("companyName", customer.getCompanyName());
         snapshot.put("firstName", customer.getFirstName());
         snapshot.put("lastName", customer.getLastName());

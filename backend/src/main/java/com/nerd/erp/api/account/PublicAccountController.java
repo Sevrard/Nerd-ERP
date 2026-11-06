@@ -2,6 +2,7 @@ package com.nerd.erp.api.account;
 
 import com.nerd.erp.api.account.AccountDtos.ActivateRequest;
 import com.nerd.erp.api.account.AccountDtos.ForgotPasswordRequest;
+import com.nerd.erp.api.account.AccountDtos.LoginBrandingResponse;
 import com.nerd.erp.api.account.AccountDtos.ResetPasswordRequest;
 import com.nerd.erp.api.account.AccountDtos.TokenInfoResponse;
 import com.nerd.erp.api.auth.LoginResponse;
@@ -47,5 +48,14 @@ public class PublicAccountController {
     @PostMapping("/activate")
     public LoginResponse activate(@Valid @RequestBody ActivateRequest request) {
         return accountService.activate(request);
+    }
+
+    /**
+     * Identité visuelle de l'écran de connexion pour un compte (slug). Renvoie des valeurs vides si le compte
+     * est inconnu ou inactif, afin de ne pas révéler l'existence d'un tenant.
+     */
+    @GetMapping("/branding")
+    public LoginBrandingResponse branding(@RequestParam(required = false) String tenant) {
+        return accountService.loginBranding(tenant);
     }
 }

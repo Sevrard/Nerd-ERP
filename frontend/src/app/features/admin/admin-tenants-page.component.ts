@@ -65,7 +65,7 @@ import { AdminApiService } from './admin-api.service';
       } @else if (!items().length) {
         <app-empty-state title="Aucun compte client." />
       } @else {
-        <div class="overflow-hidden rounded-xl border border-slate-800">
+        <div class="overflow-x-auto rounded-xl border border-slate-800">
           <table class="min-w-full divide-y divide-slate-800 text-sm">
             <thead class="bg-slate-900/80 text-left text-xs uppercase text-slate-500">
               <tr>

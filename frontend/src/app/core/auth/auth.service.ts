@@ -3,6 +3,7 @@ import { Router } from '@angular/router';
 import { Observable, of, shareReplay, tap } from 'rxjs';
 import { ApiClient } from '../api/api-client.service';
 import { LoginRequest, LoginResponse, MeResponse, ModuleCode, TenantRole } from '../../shared/models/auth.model';
+import { TermsStatus } from '../../shared/models/onboarding.model';
 
 const TOKEN_KEY = 'nerd-erp.token';
 const TENANT_SLUG_KEY = 'nerd-erp.tenant-slug';
@@ -70,6 +71,14 @@ export class AuthService {
     const current = this.profileSignal();
     if (current) {
       this.profileSignal.set({ ...current, displayName });
+    }
+  }
+
+  /** Met à jour localement l'état CGU (après acceptation). */
+  updateTerms(terms: TermsStatus): void {
+    const current = this.profileSignal();
+    if (current) {
+      this.profileSignal.set({ ...current, terms });
     }
   }
 

@@ -1,5 +1,6 @@
 package com.nerd.erp.api.auth;
 
+import com.nerd.erp.application.account.AccountService;
 import com.nerd.erp.application.auth.AuthService;
 import com.nerd.erp.application.module.ModuleAccessService;
 import com.nerd.erp.domain.module.ModuleCode;
@@ -24,12 +25,14 @@ public class AuthController {
     private final AuthService authService;
     private final WorkspaceService workspaceService;
     private final ModuleAccessService moduleAccessService;
+    private final AccountService accountService;
 
     public AuthController(AuthService authService, WorkspaceService workspaceService,
-                          ModuleAccessService moduleAccessService) {
+                          ModuleAccessService moduleAccessService, AccountService accountService) {
         this.authService = authService;
         this.workspaceService = workspaceService;
         this.moduleAccessService = moduleAccessService;
+        this.accountService = accountService;
     }
 
     @PostMapping("/login")
@@ -50,6 +53,7 @@ public class AuthController {
                 "role", user.role(),
                 "platformAdmin", user.platformAdmin(),
                 "modules", modules,
-                "workspaces", workspaces);
+                "workspaces", workspaces,
+                "terms", accountService.termsStatus());
     }
 }

@@ -15,6 +15,8 @@ import java.util.UUID;
 
 public interface CustomerRepository extends JpaRepository<Customer, UUID> {
 
+    boolean existsByTenantIdAndWorkspaceId(UUID tenantId, UUID workspaceId);
+
     Optional<Customer> findByIdAndTenantId(UUID id, UUID tenantId);
 
     @Query("""

@@ -3,6 +3,7 @@ package com.nerd.erp.api.account;
 import com.nerd.erp.api.account.AccountDtos.ChangePasswordRequest;
 import com.nerd.erp.api.account.AccountDtos.ProfileResponse;
 import com.nerd.erp.api.account.AccountDtos.ProfileUpdateRequest;
+import com.nerd.erp.api.account.AccountDtos.TermsStatusResponse;
 import com.nerd.erp.application.account.AccountService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -39,5 +40,16 @@ public class AccountController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void changePassword(@Valid @RequestBody ChangePasswordRequest request) {
         accountService.changePassword(request);
+    }
+
+    @GetMapping("/terms")
+    public TermsStatusResponse terms() {
+        return accountService.termsStatus();
+    }
+
+    /** Acceptation de la version courante des CGU/CGV. */
+    @PostMapping("/terms/accept")
+    public TermsStatusResponse acceptTerms() {
+        return accountService.acceptTerms();
     }
 }

@@ -28,8 +28,13 @@ export class ApiClient {
     return this.http.delete<void>(`${this.base}${path}`);
   }
 
-  download(path: string): Observable<Blob> {
-    return this.http.get(`${this.base}${path}`, { responseType: 'blob' });
+  /** Envoi multipart (import de fichiers) : le navigateur fixe lui-même le `Content-Type` avec la frontière. */
+  upload<T>(path: string, form: FormData, params?: Record<string, string | number | boolean | undefined | null>): Observable<T> {
+    return this.http.post<T>(`${this.base}${path}`, form, { params: this.toParams(params) });
+  }
+
+  download(path: string, params?: Record<string, string | number | boolean | undefined | null>): Observable<Blob> {
+    return this.http.get(`${this.base}${path}`, { responseType: 'blob', params: this.toParams(params) });
   }
 
   private toParams(params?: Record<string, string | number | boolean | undefined | null>): HttpParams | undefined {

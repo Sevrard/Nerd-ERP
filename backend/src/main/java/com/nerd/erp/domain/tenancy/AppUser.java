@@ -44,4 +44,11 @@ public class AppUser extends AuditableEntity {
 
     @Column(name = "last_login_at")
     private Instant lastLoginAt;
+
+    /** Version des CGU/CGV acceptée (null = jamais acceptées). */
+    @Column(name = "terms_version", length = 20)
+    private String termsVersion;
+
+    @Column(name = "terms_accepted_at")
+    private Instant termsAcceptedAt;
 }
