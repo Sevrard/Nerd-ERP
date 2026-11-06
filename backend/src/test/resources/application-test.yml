@@ -18,3 +18,6 @@ spring:
       validation-timeout: 5000
 
 nerd.security.jwt.secret: test-secret-key-at-least-256-bits-long-for-hmac-sha256!!
+nerd.mail.enabled: false
+# 32 octets Base64, uniquement pour les tests.
+nerd.mail.secrets-key: dGVzdC1zZWNyZXRzLWtleS0zMi1ieXRlcy1sb25nISE=

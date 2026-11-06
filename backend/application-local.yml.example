@@ -1,8 +1,25 @@
 # Copier vers application-local.yml (non versionné) :
 #   cp application-local.yml.example application-local.yml
 #
-# Clé : https://aistudio.google.com/apikey
+# Clé Gemini : https://aistudio.google.com/apikey
 
 nerd:
   gemini:
     api-key: COLLEZ_VOTRE_CLE_ICI
+
+  mail:
+    # Clé AES-256 (32 octets en Base64) qui chiffre les mots de passe SMTP des workspaces en base.
+    # Générer : openssl rand -base64 32   — ne jamais la changer une fois des mots de passe enregistrés.
+    secrets-key: COLLEZ_UNE_CLE_BASE64_DE_32_OCTETS
+    # URL publique du frontend (liens dans les e-mails).
+    app-base-url: http://localhost:4200
+    # Boîte « plateforme » (éditeur) : invitations, mots de passe, et secours si un workspace n'a pas de SMTP.
+    # Gmail / Google Workspace : validation en 2 étapes puis « mot de passe d'application ».
+    enabled: false
+    host: smtp.gmail.com
+    port: 587
+    security: STARTTLS
+    username: contact@exemple.fr
+    password: MOT_DE_PASSE_D_APPLICATION
+    from-email: contact@exemple.fr
+    from-name: Nerd Group

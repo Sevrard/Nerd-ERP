@@ -37,6 +37,20 @@ nerd:
       expiration-ms: ${JWT_EXPIRATION_MS:86400000}
   storage:
     invoice-documents: ${INVOICE_DOCUMENTS_DIR:data/invoice-documents}
+  mail:
+    # Boîte « plateforme » : invitations, mots de passe, et secours si un workspace n'a pas de SMTP.
+    enabled: ${MAIL_ENABLED:false}
+    host: ${MAIL_HOST:smtp.gmail.com}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    security: ${MAIL_SECURITY:STARTTLS}
+    from-email: ${MAIL_FROM_EMAIL:}
+    from-name: ${MAIL_FROM_NAME:Nerd ERP}
+    # Clé AES (32 octets en Base64) chiffrant les mots de passe SMTP des workspaces en base.
+    secrets-key: ${MAIL_SECRETS_KEY:}
+    # URL publique du frontend, utilisée dans les liens des e-mails.
+    app-base-url: ${APP_BASE_URL:http://localhost:4200}
   bootstrap:
     enabled: ${BOOTSTRAP_ENABLED:true}
     admin-email: ${BOOTSTRAP_ADMIN_EMAIL:admin@nerd.local}
