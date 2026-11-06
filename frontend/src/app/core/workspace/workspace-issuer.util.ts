@@ -55,6 +55,15 @@ export function workspaceIssuerLegalLine(w: Workspace): string {
   return [workspaceIssuerSirenLabel(w), workspaceIssuerVatLabel(w)].filter(Boolean).join(' • ');
 }
 
+/** IBAN groupé par 4 pour l'affichage (« FR76 1305 1492 … »). */
+export function workspaceIbanFormatted(w: Pick<Workspace, 'iban'>): string | null {
+  const compact = w.iban?.replace(/\s+/g, '').toUpperCase();
+  if (!compact) {
+    return null;
+  }
+  return compact.match(/.{1,4}/g)?.join(' ') ?? compact;
+}
+
 export function workspaceIssuerHasLegalProfile(w: Workspace): boolean {
   return (
     !!w.legalSubtitle?.trim() ||

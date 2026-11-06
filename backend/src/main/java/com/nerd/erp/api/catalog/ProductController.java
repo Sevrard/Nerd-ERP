@@ -4,6 +4,7 @@ import com.nerd.erp.api.catalog.ProductRequest;
 import com.nerd.erp.api.catalog.ProductResponse;
 import com.nerd.erp.application.catalog.ProductService;
 import com.nerd.erp.api.shared.PageResponse;
+import com.nerd.erp.infrastructure.security.core.RequireWriteAccess;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -42,23 +43,31 @@ public class ProductController {
         return productService.search(workspaceId, activeOnly, q, categoryId, pageable);
     }
 
+    @GetMapping("/stats")
+    public ProductStatsResponse stats(@RequestParam UUID workspaceId) {
+        return productService.stats(workspaceId);
+    }
+
     @GetMapping("/{id}")
     public ProductResponse get(@PathVariable UUID id) {
         return productService.get(id);
     }
 
     @PostMapping
+    @RequireWriteAccess
     public ProductResponse create(@Valid @RequestBody ProductRequest request) {
         return productService.create(request);
     }
 
     @PutMapping("/{id}")
+    @RequireWriteAccess
     public ProductResponse update(@PathVariable UUID id, @Valid @RequestBody ProductRequest request) {
         return productService.update(id, request);
     }
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
+    @RequireWriteAccess
     public void delete(@PathVariable UUID id) {
         productService.delete(id);
     }

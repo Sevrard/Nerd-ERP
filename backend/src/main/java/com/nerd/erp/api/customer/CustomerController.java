@@ -7,6 +7,7 @@ import com.nerd.erp.api.customer.CustomerResponse;
 import com.nerd.erp.api.customer.FollowUpRequest;
 import com.nerd.erp.application.customer.CustomerService;
 import com.nerd.erp.api.shared.PageResponse;
+import com.nerd.erp.infrastructure.security.core.RequireWriteAccess;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -45,28 +46,37 @@ public class CustomerController {
         return customerService.search(workspaceId, status, q, pageable);
     }
 
+    @GetMapping("/stats")
+    public CustomerStatsResponse stats(@RequestParam UUID workspaceId) {
+        return customerService.stats(workspaceId);
+    }
+
     @GetMapping("/{id}")
     public CustomerResponse get(@PathVariable UUID id) {
         return customerService.get(id);
     }
 
     @PostMapping
+    @RequireWriteAccess
     public CustomerResponse create(@Valid @RequestBody CustomerRequest request) {
         return customerService.create(request);
     }
 
     @PutMapping("/{id}")
+    @RequireWriteAccess
     public CustomerResponse update(@PathVariable UUID id, @Valid @RequestBody CustomerRequest request) {
         return customerService.update(id, request);
     }
 
     @PostMapping("/{id}/archive")
+    @RequireWriteAccess
     public CustomerResponse archive(@PathVariable UUID id) {
         return customerService.archive(id);
     }
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
+    @RequireWriteAccess
     public void delete(@PathVariable UUID id) {
         customerService.delete(id);
     }
@@ -77,6 +87,7 @@ public class CustomerController {
     }
 
     @PostMapping("/{id}/follow-ups")
+    @RequireWriteAccess
     public FollowUp scheduleFollowUp(@PathVariable UUID id, @Valid @RequestBody FollowUpRequest request) {
         return customerService.scheduleFollowUp(id, request);
     }

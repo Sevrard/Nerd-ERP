@@ -2,15 +2,15 @@ import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 import { ApiClient } from '../../core/api/api-client.service';
 import { Invoice } from '../../shared/models/invoice.model';
-import { PageResponse } from '../../shared/models/page.model';
+import { PageQuery, PageResponse } from '../../shared/models/page.model';
 import { Quotation, QuotationPayload } from '../../shared/models/quotation.model';
 
 @Injectable({ providedIn: 'root' })
 export class QuotationsApiService {
   private readonly api = inject(ApiClient);
 
-  list(workspaceId: string): Observable<PageResponse<Quotation>> {
-    return this.api.get<PageResponse<Quotation>>('/quotations', { workspaceId });
+  list(workspaceId: string, query: PageQuery = {}): Observable<PageResponse<Quotation>> {
+    return this.api.get<PageResponse<Quotation>>('/quotations', { workspaceId, ...query });
   }
 
   get(id: string): Observable<Quotation> {
@@ -35,5 +35,9 @@ export class QuotationsApiService {
 
   convertToInvoice(id: string): Observable<Invoice> {
     return this.api.post<Invoice>(`/quotations/${id}/convert-to-invoice`, {});
+  }
+
+  downloadPdf(id: string): Observable<Blob> {
+    return this.api.download(`/documents/quotations/${id}/download`);
   }
 }

@@ -36,6 +36,39 @@ public final class MoneyCalculator {
     public record DocumentTotals(BigDecimal totalHt, BigDecimal totalVat, BigDecimal totalTtc) {
     }
 
+    /** Totaux nets après remise globale, avec le montant HT de remise appliqué. */
+    public record DiscountedTotals(BigDecimal discountAmountHt, DocumentTotals net) {
+    }
+
+    /** {@code amount × percent / 100}, arrondi à l'échelle monétaire. */
+    public static BigDecimal percentOf(BigDecimal amount, BigDecimal percent) {
+        if (amount == null || percent == null) {
+            return BigDecimal.ZERO.setScale(MONEY_SCALE, ROUNDING);
+        }
+        return amount.multiply(percent).divide(BigDecimal.valueOf(100), MONEY_SCALE, ROUNDING);
+    }
+
+    /**
+     * Applique une remise commerciale globale (en % du HT) à des totaux bruts.
+     * La TVA étant linéaire par rapport au HT ligne à ligne, le même coefficient est
+     * appliqué à la TVA totale : équivalent à une remise proportionnelle sur chaque ligne.
+     */
+    public static DiscountedTotals applyDiscount(DocumentTotals gross, BigDecimal discountPercent) {
+        BigDecimal pct = discountPercent == null ? BigDecimal.ZERO : discountPercent;
+        if (pct.signum() <= 0) {
+            return new DiscountedTotals(BigDecimal.ZERO.setScale(MONEY_SCALE, ROUNDING), gross);
+        }
+        if (pct.compareTo(BigDecimal.valueOf(100)) > 0) {
+            throw new IllegalArgumentException("Remise > 100 %");
+        }
+        BigDecimal discountHt = percentOf(gross.totalHt(), pct);
+        BigDecimal discountVat = percentOf(gross.totalVat(), pct);
+        BigDecimal ht = gross.totalHt().subtract(discountHt).setScale(MONEY_SCALE, ROUNDING);
+        BigDecimal vat = gross.totalVat().subtract(discountVat).setScale(MONEY_SCALE, ROUNDING);
+        BigDecimal ttc = ht.add(vat).setScale(MONEY_SCALE, ROUNDING);
+        return new DiscountedTotals(discountHt, new DocumentTotals(ht, vat, ttc));
+    }
+
     public static DocumentTotals sumLines(java.util.Collection<LineTotals> lines) {
         BigDecimal ht = BigDecimal.ZERO;
         BigDecimal vat = BigDecimal.ZERO;

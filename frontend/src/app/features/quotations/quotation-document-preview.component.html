@@ -373,6 +373,23 @@
           Conditions de règlement
         </span>
         <ul class="space-y-1.5" [class.text-slate-800]="isPrint()" [class.text-slate-400]="!isPrint()">
+          @if (hasDeposit()) {
+            <li class="flex items-start gap-1.5">
+              <app-lucide-icon
+                name="circle-check"
+                [size]="14"
+                class="mt-0.5 shrink-0"
+                [class.text-emerald-700]="isPrint()"
+                [class.text-emerald-400]="!isPrint()"
+              />
+              <span
+                ><strong>Acompte exigé :</strong> {{ depositPercent() }}% à la commande ({{
+                  formatMoney(depositAmount())
+                }}
+                € TTC).</span
+              >
+            </li>
+          }
           <li class="flex items-start gap-1.5">
             <app-lucide-icon
               name="circle-check"
@@ -382,21 +399,9 @@
               [class.text-emerald-400]="!isPrint()"
             />
             <span
-              ><strong>Acompte exigé :</strong> {{ depositPercent() }}% à la commande ({{
-                formatMoney(depositAmount())
-              }}
-              € TTC).</span
+              ><strong>{{ hasDeposit() ? 'Solde :' : 'Règlement :' }}</strong> Paiement à 30 jours à compter de la
+              livraison / recette finale.</span
             >
-          </li>
-          <li class="flex items-start gap-1.5">
-            <app-lucide-icon
-              name="circle-check"
-              [size]="14"
-              class="mt-0.5 shrink-0"
-              [class.text-emerald-700]="isPrint()"
-              [class.text-emerald-400]="!isPrint()"
-            />
-            <span><strong>Solde :</strong> Paiement à 30 jours à compter de la livraison / recette finale.</span>
           </li>
           <li class="flex items-start gap-1.5">
             <app-lucide-icon
@@ -417,9 +422,20 @@
           [class.text-slate-400]="!isPrint()"
         >
           <p><strong>Titulaire :</strong> {{ workspace()?.name ?? 'NERD GROUP' }}</p>
-          <p [class.text-slate-700]="isPrint()" [class.text-slate-500]="!isPrint()">
-            IBAN / BIC : à renseigner dans les paramètres workspace (à venir).
-          </p>
+          @if (workspace(); as w) {
+            @if (ibanFormatted(w) || w.bic) {
+              @if (ibanFormatted(w); as iban) {
+                <p><strong>IBAN :</strong> {{ iban }}</p>
+              }
+              @if (w.bic) {
+                <p><strong>BIC / SWIFT :</strong> {{ w.bic }}</p>
+              }
+            } @else {
+              <p class="italic" [class.text-slate-700]="isPrint()" [class.text-slate-500]="!isPrint()">
+                IBAN / BIC : à renseigner dans les paramètres du workspace (roue crantée).
+              </p>
+            }
+          }
         </div>
       </div>
     </div>
@@ -431,6 +447,20 @@
           isPrint() ? 'border-slate-300 bg-slate-100 text-slate-900' : 'border-slate-800 bg-slate-950/80 text-slate-200'
         "
       >
+        @if (hasDiscount()) {
+          <div class="flex justify-between" [class.text-slate-700]="isPrint()" [class.text-slate-400]="!isPrint()">
+            <span>Sous-total HT :</span>
+            <span>{{ totals().subtotalHt }}</span>
+          </div>
+          <div
+            class="flex justify-between font-semibold"
+            [class.text-rose-700]="isPrint()"
+            [class.text-rose-400]="!isPrint()"
+          >
+            <span>Remise ({{ discountPercent() }}%) :</span>
+            <span>-{{ totals().discount }}</span>
+          </div>
+        }
         <div class="flex justify-between" [class.text-slate-700]="isPrint()" [class.text-slate-400]="!isPrint()">
           <span>Total HT :</span>
           <span>{{ totals().ht }}</span>
@@ -449,28 +479,30 @@
           <span>TOTAL TTC :</span>
           <span>{{ totals().ttc }}</span>
         </div>
-        <div
-          class="space-y-1.5 border-t pt-3 text-[11px]"
-          [class.border-slate-300]="isPrint()"
-          [class.border-slate-800]="!isPrint()"
-        >
+        @if (hasDeposit()) {
           <div
-            class="flex justify-between font-semibold"
-            [class.text-emerald-800]="isPrint()"
-            [class.text-emerald-500]="!isPrint()"
+            class="space-y-1.5 border-t pt-3 text-[11px]"
+            [class.border-slate-300]="isPrint()"
+            [class.border-slate-800]="!isPrint()"
           >
-            <span>Acompte à la commande ({{ depositPercent() }}%) :</span>
-            <span>{{ formatMoney(depositAmount()) }} €</span>
+            <div
+              class="flex justify-between font-semibold"
+              [class.text-emerald-800]="isPrint()"
+              [class.text-emerald-500]="!isPrint()"
+            >
+              <span>Acompte à la commande ({{ depositPercent() }}%) :</span>
+              <span>{{ formatMoney(depositAmount()) }} €</span>
+            </div>
+            <div
+              class="flex justify-between font-bold"
+              [class.text-slate-800]="isPrint()"
+              [class.text-slate-400]="!isPrint()"
+            >
+              <span>Solde restant à payer :</span>
+              <span>{{ formatMoney(balanceDue()) }} €</span>
+            </div>
           </div>
-          <div
-            class="flex justify-between font-bold"
-            [class.text-slate-800]="isPrint()"
-            [class.text-slate-400]="!isPrint()"
-          >
-            <span>Solde restant à payer :</span>
-            <span>{{ formatMoney(balanceDue()) }} €</span>
-          </div>
-        </div>
+        }
       </div>
     </div>
   </div>

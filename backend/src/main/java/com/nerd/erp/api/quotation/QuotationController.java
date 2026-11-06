@@ -6,6 +6,7 @@ import com.nerd.erp.api.quotation.QuotationRequest;
 import com.nerd.erp.api.quotation.QuotationResponse;
 import com.nerd.erp.application.quotation.QuotationService;
 import com.nerd.erp.api.shared.PageResponse;
+import com.nerd.erp.infrastructure.security.core.RequireWriteAccess;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -46,26 +47,31 @@ public class QuotationController {
     }
 
     @PostMapping
+    @RequireWriteAccess
     public QuotationResponse create(@Valid @RequestBody QuotationRequest request) {
         return quotationService.createDraft(request);
     }
 
     @PutMapping("/{id}")
+    @RequireWriteAccess
     public QuotationResponse update(@PathVariable UUID id, @Valid @RequestBody QuotationRequest request) {
         return quotationService.updateDraft(id, request);
     }
 
     @PostMapping("/{id}/send")
+    @RequireWriteAccess
     public QuotationResponse send(@PathVariable UUID id) {
         return quotationService.send(id);
     }
 
     @PostMapping("/{id}/accept")
+    @RequireWriteAccess
     public QuotationResponse accept(@PathVariable UUID id) {
         return quotationService.accept(id);
     }
 
     @PostMapping("/{id}/convert-to-invoice")
+    @RequireWriteAccess
     public InvoiceResponse convertToInvoice(@PathVariable UUID id) {
         return conversionService.convertToInvoice(id);
     }

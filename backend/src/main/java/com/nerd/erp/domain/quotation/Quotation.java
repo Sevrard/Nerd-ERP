@@ -52,6 +52,18 @@ public class Quotation extends TenantScopedEntity {
     @Column(name = "total_ttc", nullable = false, precision = 19, scale = 4)
     private BigDecimal totalTtc = BigDecimal.ZERO;
 
+    /** Remise commerciale globale en % du HT (0 = aucune). */
+    @Column(name = "discount_percent", nullable = false, precision = 5, scale = 2)
+    private BigDecimal discountPercent = BigDecimal.ZERO;
+
+    /** Montant HT de la remise (sous-total brut = totalHt + discountAmountHt). */
+    @Column(name = "discount_amount_ht", nullable = false, precision = 19, scale = 4)
+    private BigDecimal discountAmountHt = BigDecimal.ZERO;
+
+    /** Acompte exigé à la commande en % du TTC. */
+    @Column(name = "deposit_percent", nullable = false, precision = 5, scale = 2)
+    private BigDecimal depositPercent = BigDecimal.ZERO;
+
     private String notes;
 
     @Column(name = "converted_invoice_id")

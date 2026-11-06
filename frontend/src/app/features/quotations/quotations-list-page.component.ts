@@ -8,8 +8,10 @@ import { ErrorBannerComponent } from '../../shared/ui/error-banner.component';
 import { LoadingStateComponent } from '../../shared/ui/loading-state.component';
 import { IconActionComponent } from '../../shared/ui/icon-action.component';
 import { LucideIconComponent } from '../../shared/ui/lucide-icon.component';
+import { PaginatorComponent } from '../../shared/ui/paginator.component';
 import { QuotationsApiService } from './quotations-api.service';
 import { apiErrorMessage } from '../../shared/utils/api-error.util';
+import { PageState } from '../../shared/utils/page-state';
 
 @Component({
   selector: 'app-quotations-list-page',
@@ -21,6 +23,7 @@ import { apiErrorMessage } from '../../shared/utils/api-error.util';
     ErrorBannerComponent,
     IconActionComponent,
     LucideIconComponent,
+    PaginatorComponent,
   ],
   template: `
     <div class="space-y-6">
@@ -37,7 +40,7 @@ import { apiErrorMessage } from '../../shared/utils/api-error.util';
       @if (error()) {
         <app-error-banner [message]="error()!" />
       }
-      @if (loading()) {
+      @if (loading() && !items().length) {
         <app-loading-state />
       } @else if (!items().length) {
         <app-empty-state title="Aucun devis." />
@@ -74,6 +77,12 @@ import { apiErrorMessage } from '../../shared/utils/api-error.util';
               }
             </tbody>
           </table>
+          <app-paginator
+            [meta]="page.meta()"
+            [disabled]="loading()"
+            (pageChange)="onPageChange($event)"
+            (pageSizeChange)="onPageSizeChange($event)"
+          />
         </div>
       }
     </div>
@@ -86,16 +95,28 @@ export class QuotationsListPageComponent {
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
   readonly items = signal<Quotation[]>([]);
+  readonly page = new PageState();
 
   constructor() {
     effect(() => {
       this.workspaces.generation();
+      this.page.reset();
       this.reload();
     });
   }
 
   money(v: number): string {
     return formatMoney(v);
+  }
+
+  onPageChange(index: number): void {
+    this.page.goTo(index);
+    this.reload();
+  }
+
+  onPageSizeChange(size: number): void {
+    this.page.setSize(size);
+    this.reload();
   }
 
   reload(): void {
@@ -105,12 +126,13 @@ export class QuotationsListPageComponent {
     }
     const gen = this.workspaces.generation();
     this.loading.set(true);
-    this.api.list(workspaceId).subscribe({
+    this.api.list(workspaceId, this.page.query()).subscribe({
       next: (page) => {
         if (this.workspaces.isStale(gen)) {
           return;
         }
         this.items.set(page.content);
+        this.page.apply(page);
         this.loading.set(false);
       },
       error: (err) => {

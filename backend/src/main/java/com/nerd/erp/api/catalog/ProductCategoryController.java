@@ -1,6 +1,7 @@
 package com.nerd.erp.api.catalog;
 
 import com.nerd.erp.application.catalog.ProductCategoryService;
+import com.nerd.erp.infrastructure.security.core.RequireWriteAccess;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -38,17 +39,20 @@ public class ProductCategoryController {
     }
 
     @PostMapping
+    @RequireWriteAccess
     public ProductCategoryResponse create(@Valid @RequestBody ProductCategoryRequest request) {
         return categoryService.create(request);
     }
 
     @PutMapping("/{id}")
+    @RequireWriteAccess
     public ProductCategoryResponse update(@PathVariable UUID id, @Valid @RequestBody ProductCategoryRequest request) {
         return categoryService.update(id, request);
     }
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
+    @RequireWriteAccess
     public void delete(@PathVariable UUID id) {
         categoryService.delete(id);
     }

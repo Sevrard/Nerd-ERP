@@ -30,7 +30,7 @@ Le serveur de dev proxyfie l’API vers le backend Spring Boot :
 npm start
 ```
 
-(`npm start` bascule automatiquement sur la Node du `.nvmrc` si ton `node` global est trop ancien, ex. 20.17 via Homebrew.)
+Les scripts npm (`start`, `build`, `watch`, `test`) passent par `scripts/ng.mjs`, qui bascule automatiquement sur une Node compatible installée via nvm (celle du `.nvmrc` en priorité) si ton `node` global est trop ancien, ex. 20.17 via Homebrew. Un `ng build` lancé directement avec un Node trop ancien échoue en revanche : utilise `npm run build`.
 
 Ouvrir [http://localhost:4200/](http://localhost:4200/).
 
@@ -53,7 +53,7 @@ Artefacts dans `dist/`.
 ## Tests unitaires
 
 ```bash
-ng test
+npm test
 ```
 
 ## Authentification

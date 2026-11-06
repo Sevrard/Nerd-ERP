@@ -112,13 +112,13 @@
       </div>
     </div>
     <span class="text-xs font-medium text-slate-500">
-      {{ filteredCustomers().length }} résultat{{ filteredCustomers().length > 1 ? 's' : '' }}
+      {{ page.meta().totalElements }} résultat{{ page.meta().totalElements > 1 ? 's' : '' }}
     </span>
   </div>
 
-  @if (loading()) {
+  @if (loading() && !items().length) {
     <app-loading-state />
-  } @else if (!filteredCustomers().length) {
+  } @else if (!items().length) {
     <app-empty-state title="Aucun client trouvé." />
   } @else {
     <div class="overflow-hidden rounded-xl border border-slate-800/80 bg-slate-900/60 shadow-xl">
@@ -162,7 +162,7 @@
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-800/60 text-sm">
-            @for (c of sortedFilteredCustomers(); track c.id) {
+            @for (c of items(); track c.id) {
               @let editing = editingCustomerId() === c.id;
               @let draft = customerEditDraft();
               <tr class="group transition hover:bg-slate-800/40" [class.bg-cyan-950/20]="editing">
@@ -308,6 +308,12 @@
           </tbody>
         </table>
       </div>
+      <app-paginator
+        [meta]="page.meta()"
+        [disabled]="loading()"
+        (pageChange)="onPageChange($event)"
+        (pageSizeChange)="onPageSizeChange($event)"
+      />
     </div>
   }
 </div>

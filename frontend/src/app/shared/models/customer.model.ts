@@ -46,6 +46,14 @@ export interface FollowUpPayload {
   notes?: string | null;
 }
 
+/** Compteurs globaux du workspace (hors archivés), indépendants de la page affichée. */
+export interface CustomerStats {
+  total: number;
+  prospects: number;
+  clients: number;
+  followUpsDue: number;
+}
+
 export interface CustomerHistory {
   followUps: FollowUp[];
   quotations: { id: string; number: string | null; status: string; totalTtc: number }[];

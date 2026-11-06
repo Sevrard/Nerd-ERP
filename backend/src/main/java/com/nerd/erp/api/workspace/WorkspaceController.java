@@ -1,6 +1,7 @@
 package com.nerd.erp.api.workspace;
 
 import com.nerd.erp.application.workspace.WorkspaceService;
+import com.nerd.erp.infrastructure.security.core.RequireAdminAccess;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -38,17 +39,20 @@ public class WorkspaceController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
+    @RequireAdminAccess
     public WorkspaceResponse create(@Valid @RequestBody WorkspaceCreateRequest request) {
         return workspaceService.create(request);
     }
 
     @PutMapping("/{id}")
+    @RequireAdminAccess
     public WorkspaceResponse update(@PathVariable UUID id, @Valid @RequestBody WorkspaceUpdateRequest request) {
         return workspaceService.update(id, request);
     }
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
+    @RequireAdminAccess
     public void delete(@PathVariable UUID id) {
         workspaceService.delete(id);
     }

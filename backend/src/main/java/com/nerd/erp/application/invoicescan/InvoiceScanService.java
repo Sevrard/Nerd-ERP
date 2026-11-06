@@ -23,7 +23,6 @@ import com.nerd.erp.application.document.DocumentNumberService;
 import com.nerd.erp.application.invoice.InvoiceMapper;
 import com.nerd.erp.application.money.MoneyCalculator;
 import com.nerd.erp.application.workspace.WorkspaceService;
-import com.nerd.erp.application.workspace.WorkspaceShopSyncPolicy;
 import com.nerd.erp.domain.customer.Customer;
 import com.nerd.erp.domain.customer.CustomerStatus;
 import com.nerd.erp.domain.customer.CustomerType;
@@ -106,8 +105,7 @@ public class InvoiceScanService {
         SecurityContextHelper.requireWriteAccess();
         UUID tenantId = SecurityContextHelper.requireTenantId();
         UUID userId = SecurityContextHelper.requireUser().userId();
-        Workspace workspace = workspaceService.requireInTenant(workspaceId, tenantId);
-        WorkspaceShopSyncPolicy.ensurePdfImportAllowed(workspace);
+        workspaceService.requireInTenant(workspaceId, tenantId);
         MerchantScanContext merchantContext = merchantScanContextResolver.resolve(tenantId, workspaceId, merchantId);
 
         byte[] bytes = readPdf(file);
@@ -158,7 +156,6 @@ public class InvoiceScanService {
         SecurityContextHelper.requireWriteAccess();
         UUID tenantId = SecurityContextHelper.requireTenantId();
         Workspace workspace = workspaceService.requireInTenant(request.workspaceId(), tenantId);
-        WorkspaceShopSyncPolicy.ensurePdfImportAllowed(workspace);
 
         if (!request.invoiceConfirmed()) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "Confirmation de la facture requise");

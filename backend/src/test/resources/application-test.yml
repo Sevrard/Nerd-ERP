@@ -12,5 +12,9 @@ spring:
       ddl-auto: validate
   flyway:
     enabled: true
+  datasource:
+    hikari:
+      max-lifetime: 120000
+      validation-timeout: 5000
 
 nerd.security.jwt.secret: test-secret-key-at-least-256-bits-long-for-hmac-sha256!!

@@ -4,6 +4,7 @@ import com.nerd.erp.api.payment.PaymentRequest;
 import com.nerd.erp.api.payment.PaymentResponse;
 import com.nerd.erp.application.payment.PaymentService;
 import com.nerd.erp.api.shared.PageResponse;
+import com.nerd.erp.infrastructure.security.core.RequireWriteAccess;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -35,6 +36,7 @@ public class PaymentController {
     }
 
     @PostMapping
+    @RequireWriteAccess
     public PaymentResponse record(@Valid @RequestBody PaymentRequest request) {
         return paymentService.record(request);
     }

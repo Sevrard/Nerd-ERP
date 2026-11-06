@@ -1,27 +1,40 @@
 import { DatePipe } from '@angular/common';
-import { Component, computed, effect, inject, signal } from '@angular/core';
+import { Component, DestroyRef, effect, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { RouterLink } from '@angular/router';
+import { debounceTime, distinctUntilChanged, Subject } from 'rxjs';
 import { WorkspaceService } from '../../core/workspace/workspace.service';
 import {
   Customer,
   CustomerPayload,
+  CustomerStats,
   CustomerStatus,
   customerDisplayName,
 } from '../../shared/models/customer.model';
+import { sortParam } from '../../shared/models/page.model';
 import { EmptyStateComponent } from '../../shared/ui/empty-state.component';
 import { ErrorBannerComponent } from '../../shared/ui/error-banner.component';
 import { LoadingStateComponent } from '../../shared/ui/loading-state.component';
 import { IconActionComponent } from '../../shared/ui/icon-action.component';
 import { LucideIconComponent } from '../../shared/ui/lucide-icon.component';
+import { PaginatorComponent } from '../../shared/ui/paginator.component';
 import { CustomersApiService } from './customers-api.service';
 import { apiErrorMessage } from '../../shared/utils/api-error.util';
+import { PageState } from '../../shared/utils/page-state';
 import { SortableThComponent } from '../../shared/ui/sortable-th.component';
-import {
-  nextSortDirection,
-  sortMultiplier,
-  SortDirection,
-} from '../../shared/utils/table-sort.util';
+import { nextSortDirection, SortDirection } from '../../shared/utils/table-sort.util';
+
 type CustomerSortKey = 'name' | 'email' | 'location' | 'status';
+
+/** Colonnes UI → propriétés JPA triables côté serveur (plusieurs propriétés = tri composé). */
+const SORT_PROPERTIES: Record<CustomerSortKey, string> = {
+  name: 'companyName,lastName,firstName',
+  email: 'email',
+  location: 'postalCode,city',
+  status: 'status',
+};
+
+const EMPTY_STATS: CustomerStats = { total: 0, prospects: 0, clients: 0, followUpsDue: 0 };
 
 interface CustomerInlineDraft {
   companyName: string;
@@ -46,16 +59,21 @@ interface CustomerInlineDraft {
     IconActionComponent,
     LucideIconComponent,
     SortableThComponent,
+    PaginatorComponent,
   ],
   templateUrl: './customers-list-page.component.html',
 })
 export class CustomersListPageComponent {
   private readonly api = inject(CustomersApiService);
   private readonly workspaces = inject(WorkspaceService);
+  private readonly destroyRef = inject(DestroyRef);
+  private readonly searchInput$ = new Subject<string>();
 
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
   readonly items = signal<Customer[]>([]);
+  readonly stats = signal<CustomerStats>(EMPTY_STATS);
+  readonly page = new PageState();
   readonly deletingId = signal<string | null>(null);
 
   readonly filterQ = signal('');
@@ -67,73 +85,19 @@ export class CustomersListPageComponent {
   readonly customerEditDraft = signal<CustomerInlineDraft | null>(null);
   readonly savingCustomerId = signal<string | null>(null);
 
-  readonly stats = computed(() => {
-    const all = this.items().filter((c) => !c.archived);
-    const now = Date.now();
-    return {
-      total: all.length,
-      prospects: all.filter((c) => c.status === 'PROSPECT').length,
-      clients: all.filter((c) => c.status === 'CLIENT').length,
-      followUpsDue: all.filter((c) => c.nextFollowUpAt && new Date(c.nextFollowUpAt).getTime() <= now).length,
-    };
-  });
-
-  readonly filteredCustomers = computed(() => {
-    const q = this.filterQ().trim().toLowerCase();
-    const status = this.filterStatus();
-    return this.items()
-      .filter((c) => !c.archived)
-      .filter((c) => {
-        if (status && c.status !== status) {
-          return false;
-        }
-        if (!q) {
-          return true;
-        }
-        const haystack = [
-          customerDisplayName(c),
-          c.email ?? '',
-          c.phone ?? '',
-          c.city ?? '',
-          c.companyName ?? '',
-          c.firstName ?? '',
-          c.lastName ?? '',
-        ]
-          .join(' ')
-          .toLowerCase();
-        return haystack.includes(q);
-      });
-  });
-
-  readonly sortedFilteredCustomers = computed(() => {
-    const list = [...this.filteredCustomers()];
-    const key = this.customerSortKey();
-    const mul = sortMultiplier(this.customerSortDir());
-    list.sort((a, b) => {
-      let cmp = 0;
-      switch (key) {
-        case 'name':
-          cmp = customerDisplayName(a).localeCompare(customerDisplayName(b), 'fr');
-          break;
-        case 'email':
-          cmp = (a.email ?? '').localeCompare(b.email ?? '', 'fr');
-          break;
-        case 'location':
-          cmp = this.locationLine(a).localeCompare(this.locationLine(b), 'fr');
-          break;
-        case 'status':
-          cmp = a.status.localeCompare(b.status);
-          break;
-      }
-      return cmp * mul;
-    });
-    return list;
-  });
-
   constructor() {
+    this.searchInput$
+      .pipe(debounceTime(300), distinctUntilChanged(), takeUntilDestroyed(this.destroyRef))
+      .subscribe((q) => {
+        this.filterQ.set(q);
+        this.page.reset();
+        this.reload();
+      });
+
     effect(() => {
       this.workspaces.generation();
-      this.reload();
+      this.page.reset();
+      this.reloadAll();
     });
   }
 
@@ -142,21 +106,35 @@ export class CustomersListPageComponent {
   }
 
   onSearchInput(value: string): void {
-    this.filterQ.set(value);
+    this.searchInput$.next(value);
   }
 
   clearSearch(): void {
-    this.filterQ.set('');
+    this.searchInput$.next('');
   }
 
   onStatusFilterChange(value: string): void {
     this.filterStatus.set(value as '' | CustomerStatus);
+    this.page.reset();
+    this.reload();
   }
 
   onCustomerSort(key: string): void {
     const k = key as CustomerSortKey;
     this.customerSortDir.set(nextSortDirection(this.customerSortKey(), k, this.customerSortDir()));
     this.customerSortKey.set(k);
+    this.page.reset();
+    this.reload();
+  }
+
+  onPageChange(index: number): void {
+    this.page.goTo(index);
+    this.reload();
+  }
+
+  onPageSizeChange(size: number): void {
+    this.page.setSize(size);
+    this.reload();
   }
 
   startCustomerInlineEdit(c: Customer): void {
@@ -218,7 +196,7 @@ export class CustomersListPageComponent {
       next: () => {
         this.savingCustomerId.set(null);
         this.cancelCustomerInlineEdit();
-        this.reload();
+        this.reloadAll();
       },
       error: (err) => {
         this.savingCustomerId.set(null);
@@ -270,7 +248,8 @@ export class CustomersListPageComponent {
     this.api.delete(c.id).subscribe({
       next: () => {
         this.deletingId.set(null);
-        this.reload();
+        this.page.adjustAfterRemoval();
+        this.reloadAll();
       },
       error: (err) => {
         this.deletingId.set(null);
@@ -279,6 +258,13 @@ export class CustomersListPageComponent {
     });
   }
 
+  /** Liste + compteurs globaux (après création / modification / suppression, changement de workspace). */
+  reloadAll(): void {
+    this.reloadStats();
+    this.reload();
+  }
+
+  /** Page courante uniquement (navigation, filtre, tri). */
   reload(): void {
     const workspaceId = this.workspaces.selectedId();
     if (!workspaceId) {
@@ -287,20 +273,48 @@ export class CustomersListPageComponent {
     const gen = this.workspaces.generation();
     this.loading.set(true);
     this.error.set(null);
-    this.api.search(workspaceId, { size: 500 }).subscribe({
-      next: (page) => {
-        if (this.workspaces.isStale(gen)) {
-          return;
+    const sort = sortParam(SORT_PROPERTIES[this.customerSortKey()], this.customerSortDir());
+    this.api
+      .search(workspaceId, {
+        q: this.filterQ().trim() || undefined,
+        status: this.filterStatus() || undefined,
+        ...this.page.query(sort),
+      })
+      .subscribe({
+        next: (page) => {
+          if (this.workspaces.isStale(gen)) {
+            return;
+          }
+          this.items.set(page.content);
+          this.page.apply(page);
+          this.loading.set(false);
+        },
+        error: (err) => {
+          if (this.workspaces.isStale(gen)) {
+            return;
+          }
+          this.error.set(apiErrorMessage(err, 'Erreur de chargement'));
+          this.loading.set(false);
+        },
+      });
+  }
+
+  private reloadStats(): void {
+    const workspaceId = this.workspaces.selectedId();
+    if (!workspaceId) {
+      return;
+    }
+    const gen = this.workspaces.generation();
+    this.api.stats(workspaceId).subscribe({
+      next: (stats) => {
+        if (!this.workspaces.isStale(gen)) {
+          this.stats.set(stats);
         }
-        this.items.set(page.content);
-        this.loading.set(false);
       },
-      error: (err) => {
-        if (this.workspaces.isStale(gen)) {
-          return;
+      error: () => {
+        if (!this.workspaces.isStale(gen)) {
+          this.stats.set(EMPTY_STATS);
         }
-        this.error.set(apiErrorMessage(err, 'Erreur de chargement'));
-        this.loading.set(false);
       },
     });
   }

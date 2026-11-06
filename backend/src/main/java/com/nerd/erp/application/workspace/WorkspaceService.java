@@ -4,7 +4,6 @@ import com.nerd.erp.infrastructure.security.core.SecurityContextHelper;
 import com.nerd.erp.api.error.ApiException;
 import com.nerd.erp.api.workspace.WorkspaceCreateRequest;
 import com.nerd.erp.api.workspace.WorkspaceUpdateRequest;
-import com.nerd.erp.application.etsysync.EtsySyncSessionStore;
 import com.nerd.erp.application.tenancy.TenantAccessService;
 import com.nerd.erp.domain.organization.Organization;
 import com.nerd.erp.domain.workspace.Workspace;
@@ -26,25 +25,25 @@ public class WorkspaceService {
     private final TenantAccessService tenantAccessService;
     private final OrganizationRepository organizationRepository;
     private final WorkspaceCascadeDeleter workspaceCascadeDeleter;
-    private final EtsySyncSessionStore etsySyncSessionStore;
+    private final WorkspaceMapper workspaceMapper;
 
     public WorkspaceService(WorkspaceRepository workspaceRepository,
                             TenantAccessService tenantAccessService,
                             OrganizationRepository organizationRepository,
                             WorkspaceCascadeDeleter workspaceCascadeDeleter,
-                            EtsySyncSessionStore etsySyncSessionStore) {
+                            WorkspaceMapper workspaceMapper) {
         this.workspaceRepository = workspaceRepository;
         this.tenantAccessService = tenantAccessService;
         this.organizationRepository = organizationRepository;
         this.workspaceCascadeDeleter = workspaceCascadeDeleter;
-        this.etsySyncSessionStore = etsySyncSessionStore;
+        this.workspaceMapper = workspaceMapper;
     }
 
     @Transactional(readOnly = true)
     public List<WorkspaceResponse> listActiveForCurrentTenant() {
         UUID tenantId = SecurityContextHelper.requireTenantId();
         return workspaceRepository.findByTenantIdAndActiveTrueOrderByNameAsc(tenantId).stream()
-                .map(this::toResponse)
+                .map(workspaceMapper::toResponse)
                 .toList();
     }
 
@@ -52,7 +51,7 @@ public class WorkspaceService {
     public WorkspaceResponse get(UUID workspaceId) {
         UUID tenantId = SecurityContextHelper.requireTenantId();
         Workspace workspace = tenantAccessService.requireWorkspace(workspaceId, tenantId);
-        return toResponse(workspace);
+        return workspaceMapper.toResponse(workspace);
     }
 
     public Workspace requireInTenant(UUID workspaceId, UUID tenantId) {
@@ -77,7 +76,7 @@ public class WorkspaceService {
         ws.setQuotationPrefix(blankToDefault(request.quotationPrefix(), "DEV"));
         ws.setActive(true);
         ws = workspaceRepository.save(ws);
-        return toResponse(ws);
+        return workspaceMapper.toResponse(ws);
     }
 
     @Transactional
@@ -98,12 +97,14 @@ public class WorkspaceService {
         ws.setWebsiteUrl(trimToNull(request.websiteUrl()));
         ws.setSiren(trimToNull(request.siren()));
         ws.setVatNumber(trimToNull(request.vatNumber()));
+        ws.setIban(normalizeBankCode(request.iban()));
+        ws.setBic(normalizeBankCode(request.bic()));
         ws.setCurrencyCode(request.currencyCode().trim().toUpperCase());
         ws.setInvoicePrefix(request.invoicePrefix().trim());
         ws.setQuotationPrefix(request.quotationPrefix().trim());
 
         ws = workspaceRepository.save(ws);
-        return toResponse(ws);
+        return workspaceMapper.toResponse(ws);
     }
 
     @Transactional
@@ -118,7 +119,6 @@ public class WorkspaceService {
 
         workspaceCascadeDeleter.deleteWorkspaceData(tenantId, workspaceId);
         workspaceRepository.delete(workspace);
-        etsySyncSessionStore.removeByWorkspaceId(workspaceId);
     }
 
     private UUID resolveOrganizationId(UUID tenantId, UUID organizationId) {
@@ -166,28 +166,12 @@ public class WorkspaceService {
         return value.trim();
     }
 
-    private WorkspaceResponse toResponse(Workspace w) {
-        return new WorkspaceResponse(
-                w.getId(),
-                w.getName(),
-                w.getSlug(),
-                w.getOrganizationId(),
-                w.getCurrencyCode(),
-                w.getBrandColor(),
-                w.getLogoUrl(),
-                w.isActive(),
-                w.getLegalSubtitle(),
-                w.getAddressLine1(),
-                w.getAddressLine2(),
-                w.getPostalCode(),
-                w.getCity(),
-                w.getRegion(),
-                w.getCountryCode(),
-                w.getContactEmail(),
-                w.getWebsiteUrl(),
-                w.getSiren(),
-                w.getVatNumber(),
-                w.getInvoicePrefix(),
-                w.getQuotationPrefix());
+    /** IBAN / BIC : sans espaces, en majuscules (le format est validé par le DTO). */
+    private static String normalizeBankCode(String value) {
+        String trimmed = trimToNull(value);
+        if (trimmed == null) {
+            return null;
+        }
+        return trimmed.replace(" ", "").toUpperCase();
     }
 }

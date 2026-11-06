@@ -10,6 +10,7 @@ import {
 import { LucideIconComponent } from '../../shared/ui/lucide-icon.component';
 import { Customer, customerDisplayName } from '../../shared/models/customer.model';
 import {
+  workspaceIbanFormatted,
   workspaceIssuerAddressLines,
   workspaceIssuerAddressOneLine,
   workspaceIssuerHasLegalProfile,
@@ -20,7 +21,7 @@ import {
 } from '../../core/workspace/workspace-issuer.util';
 import { Workspace } from '../../shared/models/workspace.model';
 import { formatPriceHt } from '../products/product-catalog.util';
-import { QuotationPreviewLine, QuotationPreviewTotals } from './quotation-preview.model';
+import { EMPTY_PREVIEW_TOTALS, QuotationPreviewLine, QuotationPreviewTotals } from './quotation-preview.model';
 
 export type QuotationPreviewViewMode = 'screen' | 'print';
 
@@ -58,17 +59,13 @@ export class QuotationDocumentPreviewComponent implements AfterViewInit {
   readonly subject = input('Prestations et services');
   readonly executiveSummary = input<string | null>(null);
   readonly lines = input<QuotationPreviewLine[]>([]);
-  readonly totals = input<QuotationPreviewTotals>({
-    ht: '0,00 €',
-    vat: '0,00 €',
-    ttc: '0,00 €',
-    htNum: 0,
-    vatNum: 0,
-    ttcNum: 0,
-  });
+  readonly totals = input<QuotationPreviewTotals>(EMPTY_PREVIEW_TOTALS);
   readonly viewMode = input<QuotationPreviewViewMode>('screen');
   readonly embedded = input(false);
-  readonly depositPercent = input(30);
+  /** Remise commerciale globale (% du HT) — purement informatif ici, les totaux sont déjà nets. */
+  readonly discountPercent = input(0);
+  /** Acompte à la commande (% du TTC). */
+  readonly depositPercent = input(0);
 
   readonly signatureDate = signal('');
   readonly hasSignature = signal(false);
@@ -76,8 +73,14 @@ export class QuotationDocumentPreviewComponent implements AfterViewInit {
   private readonly canvasRef = viewChild<ElementRef<HTMLCanvasElement>>('signatureCanvas');
   private signing = false;
 
-  readonly depositAmount = () => (this.totals().ttcNum * this.depositPercent()) / 100;
+  readonly hasDiscount = () => this.totals().discountNum > 0;
+  readonly hasDeposit = () => this.depositPercent() > 0;
+  readonly depositAmount = () => Math.round(this.totals().ttcNum * this.depositPercent()) / 100;
   readonly balanceDue = () => this.totals().ttcNum - this.depositAmount();
+
+  ibanFormatted(w: Workspace): string | null {
+    return workspaceIbanFormatted(w);
+  }
 
   ngAfterViewInit(): void {
     this.resizeCanvas();

@@ -3,6 +3,7 @@ package com.nerd.erp.api.error;
 import com.nerd.erp.api.shared.ApiError;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
+import org.springframework.data.mapping.PropertyReferenceException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -42,6 +43,13 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ApiError> handleAccessDenied(AccessDeniedException ex, HttpServletRequest request) {
         return build(HttpStatus.FORBIDDEN, "FORBIDDEN", "Access denied", request.getRequestURI(), null);
+    }
+
+    /** Paramètre {@code sort=xxx} sur une propriété inexistante : erreur client, pas serveur. */
+    @ExceptionHandler(PropertyReferenceException.class)
+    public ResponseEntity<ApiError> handleInvalidSort(PropertyReferenceException ex, HttpServletRequest request) {
+        return build(HttpStatus.BAD_REQUEST, "INVALID_SORT",
+                "Critère de tri invalide : " + ex.getPropertyName(), request.getRequestURI(), null);
     }
 
     @ExceptionHandler(Exception.class)

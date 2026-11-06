@@ -9,6 +9,15 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Year;
 import java.util.UUID;
 
+/**
+ * Numérotation séquentielle par workspace / type / année ({@code PREFIX-AAAA-00001}).
+ *
+ * <p>Concurrence : la ligne de séquence est verrouillée ({@code SELECT … FOR UPDATE}) jusqu'au commit
+ * de la transaction appelante — deux utilisateurs qui envoient un devis en même temps obtiennent
+ * donc des numéros distincts et consécutifs, et un rollback ne consomme pas de numéro (pas de trou).
+ * La création de la ligne elle-même passe par un {@code INSERT … ON CONFLICT DO NOTHING} pour que
+ * le tout premier numéro d'un workspace ou d'une année ne provoque pas de collision.
+ */
 @Service
 public class DocumentNumberService {
 
@@ -21,16 +30,10 @@ public class DocumentNumberService {
     @Transactional
     public String nextNumber(UUID tenantId, UUID workspaceId, DocumentSequenceType type, String prefix) {
         int year = Year.now().getValue();
+        sequenceRepository.ensureExists(tenantId, workspaceId, type.name(), year);
         DocumentSequence sequence = sequenceRepository.findForUpdate(workspaceId, type, year)
-                .orElseGet(() -> {
-                    DocumentSequence created = new DocumentSequence();
-                    created.setTenantId(tenantId);
-                    created.setWorkspaceId(workspaceId);
-                    created.setSequenceType(type);
-                    created.setYear(year);
-                    created.setLastValue(0);
-                    return sequenceRepository.save(created);
-                });
+                .orElseThrow(() -> new IllegalStateException(
+                        "Séquence introuvable après création : " + workspaceId + "/" + type + "/" + year));
         long next = sequence.getLastValue() + 1;
         sequence.setLastValue(next);
         sequenceRepository.save(sequence);

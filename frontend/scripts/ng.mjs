@@ -1,6 +1,9 @@
 /**
- * Lance `ng serve` avec une version de Node compatible Angular 21,
- * même si le `node` du PATH est trop ancien (ex. 20.17 via Homebrew).
+ * Lance une commande Angular CLI (`serve`, `build`, `test`, …) avec une version de Node
+ * compatible Angular 21, même si le `node` du PATH est trop ancien (ex. 20.17 via Homebrew).
+ *
+ * Usage : node scripts/ng.mjs <commande> [options ng…]
+ * Les scripts npm `start`, `build`, `watch` et `test` passent tous par ici.
  */
 import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
@@ -74,6 +77,12 @@ function resolveNodeBin() {
   return null;
 }
 
+const ngArgs = process.argv.slice(2);
+if (!ngArgs.length) {
+  console.error('Usage : node scripts/ng.mjs <commande ng> [options]');
+  process.exit(1);
+}
+
 if (!existsSync(ngJs)) {
   console.error('Angular CLI introuvable. Lance `npm install` dans frontend/.');
   process.exit(1);
@@ -92,10 +101,14 @@ Ou mets à jour le Node par défaut de ton Mac (Homebrew, etc.).
   process.exit(1);
 }
 
-const child = spawn(nodeBin, [ngJs, 'serve', ...process.argv.slice(2)], {
+// PATH : le dossier bin de la Node choisie passe en tête pour que les sous-processus
+// (vitest, esbuild, etc.) tournent aussi avec une version compatible.
+const env = { ...process.env, PATH: `${dirname(nodeBin)}:${process.env.PATH ?? ''}` };
+
+const child = spawn(nodeBin, [ngJs, ...ngArgs], {
   cwd: frontendRoot,
   stdio: 'inherit',
-  env: process.env,
+  env,
 });
 
 child.on('exit', (code, signal) => {

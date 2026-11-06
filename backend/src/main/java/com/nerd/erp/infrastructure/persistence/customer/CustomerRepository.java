@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -42,6 +43,11 @@ public interface CustomerRepository extends JpaRepository<Customer, UUID> {
                                      Pageable pageable);
 
     long countByTenantIdAndWorkspaceIdAndStatusAndArchivedFalse(UUID tenantId, UUID workspaceId, CustomerStatus status);
+
+    long countByTenantIdAndWorkspaceIdAndArchivedFalse(UUID tenantId, UUID workspaceId);
+
+    long countByTenantIdAndWorkspaceIdAndArchivedFalseAndNextFollowUpAtLessThanEqual(
+            UUID tenantId, UUID workspaceId, Instant until);
 
     Optional<Customer> findByTenantIdAndWorkspaceIdAndArchivedFalseAndEmailIgnoreCase(
             UUID tenantId, UUID workspaceId, String email);

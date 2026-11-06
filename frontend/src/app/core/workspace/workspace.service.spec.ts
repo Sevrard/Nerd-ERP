@@ -22,6 +22,8 @@ describe('WorkspaceService', () => {
     websiteUrl: null,
     siren: null,
     vatNumber: null,
+    iban: null,
+    bic: null,
     invoicePrefix: 'FAC',
     quotationPrefix: 'DEV',
     ...over,

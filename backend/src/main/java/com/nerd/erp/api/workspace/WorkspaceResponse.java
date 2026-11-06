@@ -1,7 +1,14 @@
 package com.nerd.erp.api.workspace;
 
+import lombok.Builder;
+
 import java.util.UUID;
 
+/**
+ * Construit via {@link WorkspaceResponseBuilder} (Lombok) pour éviter les constructeurs
+ * positionnels à 20+ arguments ; voir {@code WorkspaceMapper}.
+ */
+@Builder
 public record WorkspaceResponse(
         UUID id,
         String name,
@@ -22,6 +29,8 @@ public record WorkspaceResponse(
         String websiteUrl,
         String siren,
         String vatNumber,
+        String iban,
+        String bic,
         String invoicePrefix,
         String quotationPrefix
 ) {

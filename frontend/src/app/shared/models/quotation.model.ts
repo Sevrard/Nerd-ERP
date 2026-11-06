@@ -30,9 +30,16 @@ export interface Quotation {
   status: QuotationStatus;
   issueDate: string | null;
   validUntil: string | null;
+  /** Sous-total HT brut avant remise. */
+  subtotalHt: number;
+  discountPercent: number;
+  discountAmountHt: number;
+  /** Totaux nets après remise. */
   totalHt: number;
   totalVat: number;
   totalTtc: number;
+  depositPercent: number;
+  depositAmountTtc: number;
   notes: string | null;
   convertedInvoiceId: string | null;
   lines: QuotationLine[];
@@ -44,5 +51,9 @@ export interface QuotationPayload {
   issueDate?: string | null;
   validUntil?: string | null;
   notes?: string | null;
+  /** Remise commerciale globale en % du HT. */
+  discountPercent?: number;
+  /** Acompte à la commande en % du TTC. */
+  depositPercent?: number;
   lines: DocumentLinePayload[];
 }

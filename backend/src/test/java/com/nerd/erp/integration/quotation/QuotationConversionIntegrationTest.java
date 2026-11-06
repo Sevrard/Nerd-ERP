@@ -72,6 +72,8 @@ class QuotationConversionIntegrationTest extends PostgresIntegrationTest {
                 null,
                 null,
                 null,
+                new BigDecimal("10"),
+                new BigDecimal("30"),
                 List.of(new DocumentLineRequest(null, "Prestation", BigDecimal.ONE, new BigDecimal("500"),
                         new BigDecimal("20"))));
         QuotationResponse draft = restTemplate.postForObject(
@@ -91,7 +93,21 @@ class QuotationConversionIntegrationTest extends PostgresIntegrationTest {
         assertNotNull(first);
         assertNotNull(second);
         assertEquals(first.id(), second.id());
-        assertEquals(HttpStatus.OK, HttpStatus.OK);
+
+        // Remise 10 % sur 500 HT → 450 HT / 90 TVA / 540 TTC, reportée sur la facture
+        assertEquals(0, new BigDecimal("50").compareTo(draft.discountAmountHt()));
+        assertEquals(0, new BigDecimal("450").compareTo(draft.totalHt()));
+        assertEquals(0, new BigDecimal("540").compareTo(draft.totalTtc()));
+        assertEquals(0, new BigDecimal("162").compareTo(draft.depositAmountTtc()));
+        assertEquals(0, new BigDecimal("10").compareTo(first.discountPercent()));
+        assertEquals(0, new BigDecimal("540").compareTo(first.totalTtc()));
+
+        ResponseEntity<byte[]> pdf = restTemplate.exchange(
+                "/api/v1/documents/quotations/" + draft.id() + "/download",
+                HttpMethod.GET, new HttpEntity<>(headers), byte[].class);
+        assertEquals(HttpStatus.OK, pdf.getStatusCode());
+        assertNotNull(pdf.getBody());
+        assertEquals("%PDF", new String(pdf.getBody(), 0, 4));
     }
 
     private HttpHeaders authHeaders() {

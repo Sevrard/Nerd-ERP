@@ -5,11 +5,12 @@ import {
   Customer,
   CustomerHistory,
   CustomerPayload,
+  CustomerStats,
   CustomerStatus,
   FollowUp,
   FollowUpPayload,
 } from '../../shared/models/customer.model';
-import { PageResponse } from '../../shared/models/page.model';
+import { PageQuery, PageResponse } from '../../shared/models/page.model';
 
 @Injectable({ providedIn: 'root' })
 export class CustomersApiService {
@@ -17,7 +18,7 @@ export class CustomersApiService {
 
   search(
     workspaceId: string,
-    params: { q?: string; status?: CustomerStatus; page?: number; size?: number },
+    params: { q?: string; status?: CustomerStatus } & PageQuery,
   ): Observable<PageResponse<Customer>> {
     return this.api.get<PageResponse<Customer>>('/customers', {
       workspaceId,
@@ -25,7 +26,12 @@ export class CustomersApiService {
       status: params.status,
       page: params.page ?? 0,
       size: params.size,
+      sort: params.sort,
     });
+  }
+
+  stats(workspaceId: string): Observable<CustomerStats> {
+    return this.api.get<CustomerStats>('/customers/stats', { workspaceId });
   }
 
   get(id: string): Observable<Customer> {

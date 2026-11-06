@@ -1,8 +1,8 @@
 import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 import { ApiClient } from '../../core/api/api-client.service';
-import { PageResponse } from '../../shared/models/page.model';
-import { Product, ProductPayload } from '../../shared/models/product.model';
+import { PageQuery, PageResponse } from '../../shared/models/page.model';
+import { Product, ProductPayload, ProductStats } from '../../shared/models/product.model';
 
 @Injectable({ providedIn: 'root' })
 export class ProductsApiService {
@@ -10,15 +10,21 @@ export class ProductsApiService {
 
   search(
     workspaceId: string,
-    params?: { q?: string; activeOnly?: boolean; categoryId?: string; size?: number },
+    params?: { q?: string; activeOnly?: boolean; categoryId?: string } & PageQuery,
   ): Observable<PageResponse<Product>> {
     return this.api.get<PageResponse<Product>>('/products', {
       workspaceId,
       q: params?.q,
       activeOnly: params?.activeOnly ?? true,
       categoryId: params?.categoryId,
+      page: params?.page ?? 0,
       size: params?.size,
+      sort: params?.sort,
     });
+  }
+
+  stats(workspaceId: string): Observable<ProductStats> {
+    return this.api.get<ProductStats>('/products/stats', { workspaceId });
   }
 
   get(id: string): Observable<Product> {

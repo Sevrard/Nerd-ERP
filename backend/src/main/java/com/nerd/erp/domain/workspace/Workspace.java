@@ -70,6 +70,12 @@ public class Workspace extends TenantScopedEntity {
     @Column(name = "vat_number", length = 32)
     private String vatNumber;
 
+    @Column(length = 34)
+    private String iban;
+
+    @Column(length = 11)
+    private String bic;
+
     @Column(nullable = false)
     private boolean active = true;
 }

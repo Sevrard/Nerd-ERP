@@ -1,6 +1,7 @@
 package com.nerd.erp.api.catalog;
 
 import com.nerd.erp.application.catalog.CatalogPackageService;
+import com.nerd.erp.infrastructure.security.core.RequireWriteAccess;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -38,17 +39,20 @@ public class CatalogPackageController {
     }
 
     @PostMapping
+    @RequireWriteAccess
     public CatalogPackageResponse create(@Valid @RequestBody CatalogPackageRequest request) {
         return packageService.create(request);
     }
 
     @PutMapping("/{id}")
+    @RequireWriteAccess
     public CatalogPackageResponse update(@PathVariable UUID id, @Valid @RequestBody CatalogPackageRequest request) {
         return packageService.update(id, request);
     }
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
+    @RequireWriteAccess
     public void delete(@PathVariable UUID id) {
         packageService.delete(id);
     }

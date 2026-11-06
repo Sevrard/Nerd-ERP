@@ -103,10 +103,14 @@ public class QuotationConversionService {
                 .toList();
         List<InvoiceLine> lines = DocumentLineBuilder.buildInvoiceLines(tenantId, inputs);
         invoice.replaceLines(lines);
-        MoneyCalculator.DocumentTotals totals = DocumentLineBuilder.totalsFromInvoiceLines(lines);
-        invoice.setTotalHt(totals.totalHt());
-        invoice.setTotalVat(totals.totalVat());
-        invoice.setTotalTtc(totals.totalTtc());
+        MoneyCalculator.DocumentTotals gross = DocumentLineBuilder.totalsFromInvoiceLines(lines);
+        MoneyCalculator.DiscountedTotals discounted =
+                MoneyCalculator.applyDiscount(gross, quotation.getDiscountPercent());
+        invoice.setDiscountPercent(quotation.getDiscountPercent());
+        invoice.setDiscountAmountHt(discounted.discountAmountHt());
+        invoice.setTotalHt(discounted.net().totalHt());
+        invoice.setTotalVat(discounted.net().totalVat());
+        invoice.setTotalTtc(discounted.net().totalTtc());
 
         String number = documentNumberService.nextNumber(tenantId, workspace.getId(),
                 DocumentSequenceType.INVOICE, workspace.getInvoicePrefix());

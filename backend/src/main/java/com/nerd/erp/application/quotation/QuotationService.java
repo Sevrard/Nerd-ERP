@@ -6,7 +6,6 @@ import com.nerd.erp.domain.quotation.Quotation;
 import com.nerd.erp.domain.quotation.QuotationLine;
 import com.nerd.erp.domain.quotation.QuotationStatus;
 import com.nerd.erp.api.quotation.DocumentLineRequest;
-import com.nerd.erp.api.quotation.QuotationLineResponse;
 import com.nerd.erp.api.quotation.QuotationRequest;
 import com.nerd.erp.api.quotation.QuotationResponse;
 import com.nerd.erp.infrastructure.persistence.quotation.QuotationRepository;
@@ -26,6 +25,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
@@ -40,19 +41,22 @@ public class QuotationService {
     private final WorkspaceService workspaceService;
     private final DocumentNumberService documentNumberService;
     private final AuditService auditService;
+    private final QuotationMapper quotationMapper;
 
     public QuotationService(QuotationRepository quotationRepository,
                             CustomerService customerService,
                             ProductService productService,
                             WorkspaceService workspaceService,
                             DocumentNumberService documentNumberService,
-                            AuditService auditService) {
+                            AuditService auditService,
+                            QuotationMapper quotationMapper) {
         this.quotationRepository = quotationRepository;
         this.customerService = customerService;
         this.productService = productService;
         this.workspaceService = workspaceService;
         this.documentNumberService = documentNumberService;
         this.auditService = auditService;
+        this.quotationMapper = quotationMapper;
     }
 
     @Transactional(readOnly = true)
@@ -139,7 +143,7 @@ public class QuotationService {
         return toResponse(quotation);
     }
 
-    Quotation requireQuotation(UUID id) {
+    public Quotation requireQuotation(UUID id) {
         UUID tenantId = SecurityContextHelper.requireTenantId();
         Quotation quotation = quotationRepository.findByIdAndTenantId(id, tenantId)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Quotation not found"));
@@ -157,10 +161,22 @@ public class QuotationService {
         validateProducts(tenantId, inputs);
         List<QuotationLine> lines = DocumentLineBuilder.buildQuotationLines(tenantId, inputs);
         quotation.replaceLines(lines);
-        MoneyCalculator.DocumentTotals totals = DocumentLineBuilder.totalsFromQuotationLines(lines);
-        quotation.setTotalHt(totals.totalHt());
-        quotation.setTotalVat(totals.totalVat());
-        quotation.setTotalTtc(totals.totalTtc());
+
+        BigDecimal discountPercent = percentOrZero(request.discountPercent());
+        BigDecimal depositPercent = percentOrZero(request.depositPercent());
+        MoneyCalculator.DocumentTotals gross = DocumentLineBuilder.totalsFromQuotationLines(lines);
+        MoneyCalculator.DiscountedTotals discounted = MoneyCalculator.applyDiscount(gross, discountPercent);
+
+        quotation.setDiscountPercent(discountPercent);
+        quotation.setDiscountAmountHt(discounted.discountAmountHt());
+        quotation.setDepositPercent(depositPercent);
+        quotation.setTotalHt(discounted.net().totalHt());
+        quotation.setTotalVat(discounted.net().totalVat());
+        quotation.setTotalTtc(discounted.net().totalTtc());
+    }
+
+    private static BigDecimal percentOrZero(BigDecimal value) {
+        return value == null ? BigDecimal.ZERO : value.setScale(2, RoundingMode.HALF_UP);
     }
 
     private void validateProducts(UUID tenantId, List<DocumentLineBuilder.LineInput> inputs) {
@@ -183,13 +199,6 @@ public class QuotationService {
     }
 
     private QuotationResponse toResponse(Quotation q) {
-        List<QuotationLineResponse> lines = q.getLines().stream()
-                .map(l -> new QuotationLineResponse(l.getId(), l.getProductId(), l.getLineOrder(),
-                        l.getDescription(), l.getQuantity(), l.getUnitPriceHt(), l.getVatRate(),
-                        l.getLineTotalHt(), l.getLineTotalVat(), l.getLineTotalTtc()))
-                .toList();
-        return new QuotationResponse(q.getId(), q.getWorkspaceId(), q.getCustomerId(), q.getNumber(),
-                q.getStatus(), q.getIssueDate(), q.getValidUntil(), q.getTotalHt(), q.getTotalVat(),
-                q.getTotalTtc(), q.getNotes(), q.getConvertedInvoiceId(), lines);
+        return quotationMapper.toResponse(q);
     }
 }

@@ -18,6 +18,8 @@ export interface Workspace {
   websiteUrl: string | null;
   siren: string | null;
   vatNumber: string | null;
+  iban: string | null;
+  bic: string | null;
   invoicePrefix: string;
   quotationPrefix: string;
 }
@@ -35,6 +37,8 @@ export type WorkspaceUpdatePayload = {
   websiteUrl?: string | null;
   siren?: string | null;
   vatNumber?: string | null;
+  iban?: string | null;
+  bic?: string | null;
   currencyCode: string;
   invoicePrefix: string;
   quotationPrefix: string;
