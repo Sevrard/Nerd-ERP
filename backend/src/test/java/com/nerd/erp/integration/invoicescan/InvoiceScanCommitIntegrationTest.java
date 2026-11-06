@@ -66,7 +66,7 @@ class InvoiceScanCommitIntegrationTest extends PostgresIntegrationTest {
         ExtractedInvoiceData extraction = new ExtractedInvoiceData(
                 "392192504",
                 null,
-                "Etsy",
+                "Fournisseur Test",
                 "2025-12-24",
                 customer,
                 List.of(new ExtractedInvoiceData.ExtractedLine(
@@ -93,7 +93,7 @@ class InvoiceScanCommitIntegrationTest extends PostgresIntegrationTest {
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
         assertEquals(2, response.getBody().lines().size());
-        assertEquals("Etsy", response.getBody().merchant());
+        assertEquals("Fournisseur Test", response.getBody().merchant());
         assertEquals("392192504", response.getBody().externalReference());
     }
 

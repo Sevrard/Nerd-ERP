@@ -57,10 +57,4 @@ public class InvoiceLine {
 
     @Column(name = "product_id")
     private UUID productId;
-
-    @Column(name = "etsy_listing_id")
-    private Long etsyListingId;
-
-    @Column(name = "etsy_transaction_id")
-    private Long etsyTransactionId;
 }

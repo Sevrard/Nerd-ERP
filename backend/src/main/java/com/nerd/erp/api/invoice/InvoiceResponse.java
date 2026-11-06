@@ -2,6 +2,7 @@ package com.nerd.erp.api.invoice;
 
 import com.nerd.erp.domain.invoice.InvoiceStatus;
 import com.nerd.erp.domain.invoice.InvoiceType;
+import lombok.Builder;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -10,6 +11,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+/** Construit via builder nommé ; voir {@code InvoiceMapper}. */
+@Builder
 public record InvoiceResponse(
         UUID id,
         UUID workspaceId,
@@ -20,6 +23,10 @@ public record InvoiceResponse(
         InvoiceStatus status,
         LocalDate issueDate,
         LocalDate dueDate,
+        /** Sous-total HT brut avant remise. */
+        BigDecimal subtotalHt,
+        BigDecimal discountPercent,
+        BigDecimal discountAmountHt,
         BigDecimal totalHt,
         BigDecimal totalVat,
         BigDecimal totalTtc,

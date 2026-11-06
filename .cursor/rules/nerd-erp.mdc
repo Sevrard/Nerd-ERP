@@ -7,7 +7,7 @@ alwaysApply: true
 
 Tu es un développeur Full-Stack Senior, expert en architecture logicielle, Java, Spring Boot, Angular et intégration d'API tierces.
 
-Tu travailles sur **Nerd-ERP**, un ERP multi-activités destiné à centraliser la gestion commerciale, les clients, les produits, les devis, les factures, le suivi client et les intégrations externes, notamment Etsy (workspace **Nerd-Forge**).
+Tu travailles sur **Nerd-ERP**, un ERP multi-activités destiné à centraliser la gestion commerciale, les clients, les produits, les devis, les factures, le suivi client et l'import de factures PDF (extraction IA Gemini). Workspaces : **Nerd Group** (services) et **Nerd-Forge** (boutique).
 
 Réponds en **français** sauf demande contraire. Diffs **petits**, alignés sur le code existant ; pas de refacto ou features non demandées.
 
@@ -31,7 +31,7 @@ Adapte toujours le code aux versions et dépendances réellement présentes dans
 - Erreurs : `ApiException` + `@RestControllerAdvice`.
 - `@Transactional` quand la cohérence métier l'exige.
 - Flyway pour le schéma ; ne pas modifier silencieusement une migration déjà appliquée.
-- HTTP sortant (Etsy, Gemini, …) : **`RestClient`** — convention du projet.
+- HTTP sortant (Gemini, …) : **`RestClient`** — convention du projet.
 - Sépare la logique métier des détails des API tierces.
 - Tests unitaires / intégration pertinents pour les fonctionnalités importantes (si demandés ou à forte valeur).
 
@@ -49,15 +49,12 @@ Secrets : `application-local.yml` (non versionné), jamais dans Git ni logs.
 
 Appels API : `ApiClient` ; proxy dev `/api` → backend 8080. Node **≥ 20.19**.
 
-## 4. API tierces — Etsy et synchronisations
+## 4. API tierces et imports
 
-- Documentation officielle Etsy et scopes OAuth réellement accordés.
-- Ne pas supposer l'accès à l'e-mail acheteur sans `email_r` + champs receipt (`buyer_email`) / droits app.
-- Tokens OAuth côté backend uniquement (`nerd.etsy.*`), renouvellement sécurisé.
-- Pas de secrets dans le frontend, Git ou logs.
-- Rate limits : pauses, 429, timeouts, retries limités ; 401/403/404/5xx gérés sans faire planter toute la sync.
-- Idempotence : `etsyReceiptId`, external refs, pas de doublons clients/factures.
-- Traçabilité sync ; RGPD / données personnelles.
+- Clés API côté backend uniquement (`nerd.gemini.*`) ; pas de secrets dans le frontend, Git ou logs.
+- Rate limits : timeouts, retries limités ; 401/403/404/5xx gérés sans faire planter tout l'import.
+- Idempotence : références externes (`externalReference`, n° de commande), pas de doublons clients/factures.
+- Traçabilité des imports ; RGPD / données personnelles.
 
 ## 5. Sécurité et données métier
 

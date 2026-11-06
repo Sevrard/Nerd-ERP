@@ -37,20 +37,3 @@ export function apiErrorMessage(err: unknown, fallback = 'Une erreur est survenu
   }
   return fallback;
 }
-
-export function etsyApiErrorMessage(err: unknown, fallback = 'Erreur Etsy'): string {
-  const raw = apiErrorMessage(err, fallback);
-  if (/invalid_token|401|expir/i.test(raw)) {
-    return (
-      'Token Etsy expiré. Dans un terminal : cd backend && node scripts/etsy-refresh-token.mjs ' +
-      '(puis redémarrez le backend). Si ça échoue, relancez node scripts/etsy-oauth.mjs.'
-    );
-  }
-  if (/Etsy : session expirée/i.test(raw)) {
-    return raw;
-  }
-  if (raw.length > 280) {
-    return raw.slice(0, 280) + '…';
-  }
-  return raw;
-}

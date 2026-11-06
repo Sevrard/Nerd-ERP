@@ -37,13 +37,6 @@ nerd:
       expiration-ms: ${JWT_EXPIRATION_MS:86400000}
   storage:
     invoice-documents: ${INVOICE_DOCUMENTS_DIR:data/invoice-documents}
-  etsy:
-    api-key: ${ETSY_API_KEY:}
-    shared-secret: ${ETSY_SHARED_SECRET:}
-    access-token: ${ETSY_ACCESS_TOKEN:}
-    refresh-token: ${ETSY_REFRESH_TOKEN:}
-    shop-id: ${ETSY_SHOP_ID:0}
-    enabled: ${ETSY_ENABLED:true}
   bootstrap:
     enabled: ${BOOTSTRAP_ENABLED:true}
     admin-email: ${BOOTSTRAP_ADMIN_EMAIL:admin@nerd.local}

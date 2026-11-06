@@ -32,8 +32,8 @@ public class MerchantScanContextResolver {
             throw new ApiException(HttpStatus.BAD_REQUEST, "Marchand hors du workspace sélectionné");
         }
         String prompt = merchant.getExtractionPrompt();
-        if (prompt == null || prompt.isBlank()) {
-            prompt = MerchantExtractionPrompts.templateForSlug(merchant.getSlug());
+        if (prompt != null && prompt.isBlank()) {
+            prompt = null;
         }
         return new MerchantScanContext(
                 merchant.getId(),

@@ -13,8 +13,6 @@ public record InvoiceLineResponse(
         BigDecimal lineTotalHt,
         BigDecimal lineTotalVat,
         BigDecimal lineTotalTtc,
-        UUID productId,
-        Long etsyListingId,
-        Long etsyTransactionId
+        UUID productId
 ) {
 }

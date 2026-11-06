@@ -94,8 +94,6 @@ import { apiErrorMessage } from '../../shared/utils/api-error.util';
                           [link]="['/products', line.productId, 'edit']"
                         />
                       </div>
-                    } @else if (line.etsyListingId) {
-                      <span class="mt-1 block text-xs text-slate-500">Listing Etsy #{{ line.etsyListingId }}</span>
                     }
                   </td>
                   <td class="px-4 py-3 text-slate-400">{{ line.quantity }}</td>

@@ -6,6 +6,7 @@ import com.nerd.erp.api.invoice.InvoiceLineResponse;
 import com.nerd.erp.api.invoice.InvoiceResponse;
 import org.springframework.stereotype.Component;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @Component
@@ -13,27 +14,33 @@ public class InvoiceMapper {
 
     public InvoiceResponse toResponse(Invoice invoice) {
         List<InvoiceLineResponse> lines = invoice.getLines().stream().map(this::toLine).toList();
-        return new InvoiceResponse(
-                invoice.getId(),
-                invoice.getWorkspaceId(),
-                invoice.getCustomerId(),
-                invoice.getSourceQuotationId(),
-                invoice.getInvoiceType(),
-                invoice.getNumber(),
-                invoice.getStatus(),
-                invoice.getIssueDate(),
-                invoice.getDueDate(),
-                invoice.getTotalHt(),
-                invoice.getTotalVat(),
-                invoice.getTotalTtc(),
-                invoice.getAmountPaid(),
-                invoice.getSnapshotCustomer(),
-                invoice.getNotes(),
-                invoice.getExternalReference(),
-                invoice.getMerchant(),
-                invoice.getOrderNumber(),
-                invoice.getIssuedAt(),
-                lines);
+        BigDecimal discountAmount = nz(invoice.getDiscountAmountHt());
+        BigDecimal totalHt = nz(invoice.getTotalHt());
+        return InvoiceResponse.builder()
+                .id(invoice.getId())
+                .workspaceId(invoice.getWorkspaceId())
+                .customerId(invoice.getCustomerId())
+                .sourceQuotationId(invoice.getSourceQuotationId())
+                .invoiceType(invoice.getInvoiceType())
+                .number(invoice.getNumber())
+                .status(invoice.getStatus())
+                .issueDate(invoice.getIssueDate())
+                .dueDate(invoice.getDueDate())
+                .subtotalHt(totalHt.add(discountAmount))
+                .discountPercent(nz(invoice.getDiscountPercent()))
+                .discountAmountHt(discountAmount)
+                .totalHt(totalHt)
+                .totalVat(invoice.getTotalVat())
+                .totalTtc(invoice.getTotalTtc())
+                .amountPaid(invoice.getAmountPaid())
+                .snapshotCustomer(invoice.getSnapshotCustomer())
+                .notes(invoice.getNotes())
+                .externalReference(invoice.getExternalReference())
+                .merchant(invoice.getMerchant())
+                .orderNumber(invoice.getOrderNumber())
+                .issuedAt(invoice.getIssuedAt())
+                .lines(lines)
+                .build();
     }
 
     private InvoiceLineResponse toLine(InvoiceLine line) {
@@ -47,8 +54,10 @@ public class InvoiceMapper {
                 line.getLineTotalHt(),
                 line.getLineTotalVat(),
                 line.getLineTotalTtc(),
-                line.getProductId(),
-                line.getEtsyListingId(),
-                line.getEtsyTransactionId());
+                line.getProductId());
+    }
+
+    private static BigDecimal nz(BigDecimal value) {
+        return value == null ? BigDecimal.ZERO : value;
     }
 }

@@ -8,6 +8,11 @@ Monolithe modulaire Java 21 / Spring Boot 3.3 pour la gestion multi-workspace (N
 - Maven 3.9+
 - Docker (PostgreSQL local et tests Testcontainers)
 
+## Tests Maven
+
+- **`mvn test` / `mvn package` / `mvn install`** : exécute les tests unitaires **sans** les classes `*IntegrationTest` (elles ont besoin de Docker + Testcontainers).
+- **Avec intégration** : `mvn verify -Pintegration-tests` (Docker doit tourner).
+
 ## PostgreSQL local
 
 PostgreSQL n’est exposé que sur `127.0.0.1` via Docker Compose :
@@ -58,76 +63,6 @@ mvn spring-boot:run
 ```
 
 Redémarrez le backend après toute modification (le processus `spring-boot:run` en cours ne recharge pas la clé seul).
-
-## Synchronisation Etsy (workspace Nerd-Forge)
-
-Sans ces valeurs, le dashboard affiche *« API Etsy non configurée »*.
-
-| Clé `application-local.yml` | Variable d’env | Description |
-|-----------------------------|----------------|-------------|
-| `nerd.etsy.api-key` | `ETSY_API_KEY` | **Keystring** de l’app (ou `keystring:shared_secret` en une seule valeur) |
-| `nerd.etsy.shared-secret` | `ETSY_SHARED_SECRET` | **Shared secret** (obligatoire si `api-key` n’inclut pas déjà `:`) |
-| `nerd.etsy.access-token` | `ETSY_ACCESS_TOKEN` | Token OAuth utilisateur (scopes **`transactions_r`**, listings) |
-| `nerd.etsy.shop-id` | `ETSY_SHOP_ID` | ID numérique de la boutique |
-
-Exemple dans `application-local.yml` (voir aussi `application-local.yml.example`) :
-
-```yaml
-nerd:
-  etsy:
-    api-key: …
-    access-token: …
-    shop-id: 12345678
-```
-
-Redémarrer le backend après modification.
-
-### Ce que l’écran « Your Apps » donne (et ce qu’il ne donne pas)
-
-| Etsy Developers | Rôle | YAML |
-|-----------------|------|------|
-| **Keystring** | Identifie l’app | `nerd.etsy.api-key` |
-| **Shared secret** | Complète `x-api-key` | `nerd.etsy.shared-secret` |
-| *(absent de cette page)* | Accès à **tes** commandes / listings privés | `nerd.etsy.access-token` (OAuth 2.0) |
-
-Le **shared secret n’est pas** le `access-token`. Sans OAuth, le ping public peut marcher, pas la sync des receipts.
-
-**Obtenir un `access-token` (une fois, ~5 min)** — [Quick Start Etsy](https://developers.etsy.com/documentation/tutorials/quickstart) :
-
-1. Dans l’app Etsy, ajoute une **Redirect URL** `https` (ex. `http://localhost:3003/oauth/redirect` pour un petit script local).
-2. Ouvre une URL du type `https://www.etsy.com/oauth/connect?...` avec `client_id=<keystring>`, `scope=transactions_r%20listings_r`, PKCE (`code_challenge` / `code_verifier`).
-3. Après autorisation, échange le `code` contre un token : `POST https://api.etsy.com/v3/public/oauth/token` (`grant_type=authorization_code`, `code_verifier`, …).
-4. Copie **`access_token`** (commence par ton `user_id` + `.`) dans `access-token`. Conserve **`refresh_token`** pour renouveler (durée ~1 h pour l’access token).
-
-**Script local (recommandé)** — lit `api-key` / `shared-secret` depuis `application-local.yml` :
-
-```bash
-cd backend
-node scripts/etsy-oauth.mjs
-```
-
-Étapes détaillées :
-
-1. Sur [Your Apps](https://www.etsy.com/developers/your-apps) → app **nerd-erp** → **Redirect URI** : ajoute exactement `http://localhost:3003/oauth/redirect` (même port que le script).
-2. Dans un terminal : `cd backend && node scripts/etsy-oauth.mjs`.
-3. Copie l’URL longue affichée (`https://www.etsy.com/oauth/connect?...`) et ouvre-la dans le navigateur (session Etsy du vendeur).
-4. Clique **Autoriser** → le navigateur revient sur localhost → le terminal affiche `access-token: …` à coller dans `application-local.yml`.
-5. Redémarre `mvn spring-boot:run`.
-
-Options : `--port 3004`, `--scopes "transactions_r listings_r"`, ou variables `ETSY_KEYSTRING` / `ETSY_SHARED_SECRET`.
-
-**Renouveler l’access token** (expire ~1 h ; le `refresh-token` dure ~90 j) :
-
-```bash
-cd backend
-node scripts/etsy-refresh-token.mjs
-```
-
-Met à jour `access-token` (et `refresh-token` si Etsy en renvoie un) dans `application-local.yml`, puis redémarre le backend. `--no-write` pour afficher sans écrire le fichier.
-
-| Clé YAML | Description |
-|----------|-------------|
-| `nerd.etsy.refresh-token` | Jeton de renouvellement (sortie de `etsy-oauth.mjs`) |
 
 ## Lancement
 

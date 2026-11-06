@@ -1,6 +1,5 @@
 package com.nerd.erp.infrastructure.bootstrap.core;
 
-import com.nerd.erp.application.merchant.MerchantExtractionPrompts;
 import com.nerd.erp.domain.merchant.Merchant;
 import com.nerd.erp.domain.workspace.Workspace;
 import com.nerd.erp.infrastructure.persistence.merchant.MerchantRepository;
@@ -33,8 +32,6 @@ public class MerchantSeedRunner implements ApplicationRunner {
             if (!NERD_FORGE_SLUG.equals(workspace.getSlug())) {
                 continue;
             }
-            ensureMerchant(workspace, "Etsy", MerchantExtractionPrompts.SLUG_ETSY,
-                    "/branding/etsy-icon.png", MerchantExtractionPrompts.ETSY);
             ensureMerchant(workspace, "Nerd-Forge", "nerd-forge", NERD_FORGE_MERCHANT_LOGO, null);
         }
     }

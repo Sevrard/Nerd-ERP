@@ -66,6 +66,14 @@ public class Invoice extends TenantScopedEntity {
     @Column(name = "amount_paid", nullable = false, precision = 19, scale = 4)
     private BigDecimal amountPaid = BigDecimal.ZERO;
 
+    /** Remise commerciale globale en % du HT (reportée depuis le devis). */
+    @Column(name = "discount_percent", nullable = false, precision = 5, scale = 2)
+    private BigDecimal discountPercent = BigDecimal.ZERO;
+
+    /** Montant HT de la remise (sous-total brut = totalHt + discountAmountHt). */
+    @Column(name = "discount_amount_ht", nullable = false, precision = 19, scale = 4)
+    private BigDecimal discountAmountHt = BigDecimal.ZERO;
+
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "snapshot_customer", nullable = false, columnDefinition = "jsonb")
     private Map<String, Object> snapshotCustomer = Map.of();
@@ -86,9 +94,6 @@ public class Invoice extends TenantScopedEntity {
 
     @Column(name = "source_document_path", length = 512)
     private String sourceDocumentPath;
-
-    @Column(name = "etsy_receipt_id")
-    private Long etsyReceiptId;
 
     @OneToMany(mappedBy = "invoice", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("lineOrder ASC")

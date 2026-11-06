@@ -12,8 +12,6 @@ export interface InvoiceLine {
   lineTotalVat: number;
   lineTotalTtc: number;
   productId: string | null;
-  etsyListingId: number | null;
-  etsyTransactionId: number | null;
 }
 
 export function invoiceCustomerDisplayName(invoice: Pick<Invoice, 'snapshotCustomer'>): string {
@@ -43,6 +41,10 @@ export interface Invoice {
   status: InvoiceStatus;
   issueDate: string;
   dueDate: string;
+  /** Sous-total HT brut avant remise. */
+  subtotalHt: number;
+  discountPercent: number;
+  discountAmountHt: number;
   totalHt: number;
   totalVat: number;
   totalTtc: number;

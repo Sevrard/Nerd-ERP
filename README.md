@@ -28,5 +28,5 @@ npm install
 npm start
 ```
 
-Prérequis : **Node.js ≥ 20.19** (recommandé : 22.12). Proxy dev vers le backend sur `/api`.
+Prérequis : **Node.js ≥ 20.19** (recommandé : 22.12). Les scripts `npm start` / `npm run build` / `npm test` basculent d'eux-mêmes sur une Node nvm compatible si le `node` global est trop ancien. Proxy dev vers le backend sur `/api`.
 # Nerd-ERP

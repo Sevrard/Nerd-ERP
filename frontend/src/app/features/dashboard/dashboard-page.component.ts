@@ -1,4 +1,4 @@
-import { Component, computed, effect, inject, signal } from '@angular/core';
+import { Component, effect, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { ApiClient } from '../../core/api/api-client.service';
 import { WorkspaceService } from '../../core/workspace/workspace.service';
@@ -7,7 +7,6 @@ import { formatMoney } from '../../shared/utils/money.util';
 import { ErrorBannerComponent } from '../../shared/ui/error-banner.component';
 import { LoadingStateComponent } from '../../shared/ui/loading-state.component';
 import { LucideIconComponent, LucideIconName } from '../../shared/ui/lucide-icon.component';
-import { EtsySyncPanelComponent } from './etsy-sync-panel.component';
 import { DashboardProductStatsComponent } from './dashboard-product-stats.component';
 import { apiErrorMessage } from '../../shared/utils/api-error.util';
 
@@ -28,15 +27,10 @@ interface KpiCard {
     ErrorBannerComponent,
     LoadingStateComponent,
     LucideIconComponent,
-    EtsySyncPanelComponent,
     DashboardProductStatsComponent,
   ],
   template: `
     <div class="w-full space-y-6">
-      @if (isNerdForge()) {
-        <app-etsy-sync-panel (syncCompleted)="onEtsySyncCompleted()" />
-      }
-
       <div class="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 class="text-2xl font-bold tracking-tight text-white">Dashboard</h1>
@@ -136,7 +130,6 @@ export class DashboardPageComponent {
   readonly cards = signal<KpiCard[]>([]);
   readonly allPeriods = signal(false);
   readonly statsRefresh = signal(0);
-  readonly isNerdForge = computed(() => this.workspaces.selectedWorkspace()?.slug === 'nerd-forge');
 
   constructor() {
     effect(() => {
@@ -147,11 +140,6 @@ export class DashboardPageComponent {
   }
 
   reload(): void {
-    this.load();
-  }
-
-  onEtsySyncCompleted(): void {
-    this.statsRefresh.update((n) => n + 1);
     this.load();
   }
 

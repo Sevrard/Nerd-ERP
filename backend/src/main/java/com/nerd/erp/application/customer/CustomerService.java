@@ -6,6 +6,7 @@ import com.nerd.erp.domain.customer.CustomerType;
 import com.nerd.erp.domain.customer.FollowUp;
 import com.nerd.erp.api.customer.CustomerRequest;
 import com.nerd.erp.api.customer.CustomerResponse;
+import com.nerd.erp.api.customer.CustomerStatsResponse;
 import com.nerd.erp.api.customer.FollowUpRequest;
 import com.nerd.erp.infrastructure.persistence.customer.CustomerRepository;
 import com.nerd.erp.infrastructure.persistence.customer.FollowUpRepository;
@@ -24,9 +25,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -71,6 +72,20 @@ public class CustomerService {
     }
 
     @Transactional(readOnly = true)
+    public CustomerStatsResponse stats(UUID workspaceId) {
+        UUID tenantId = SecurityContextHelper.requireTenantId();
+        workspaceService.requireInTenant(workspaceId, tenantId);
+        return new CustomerStatsResponse(
+                customerRepository.countByTenantIdAndWorkspaceIdAndArchivedFalse(tenantId, workspaceId),
+                customerRepository.countByTenantIdAndWorkspaceIdAndStatusAndArchivedFalse(
+                        tenantId, workspaceId, CustomerStatus.PROSPECT),
+                customerRepository.countByTenantIdAndWorkspaceIdAndStatusAndArchivedFalse(
+                        tenantId, workspaceId, CustomerStatus.CLIENT),
+                customerRepository.countByTenantIdAndWorkspaceIdAndArchivedFalseAndNextFollowUpAtLessThanEqual(
+                        tenantId, workspaceId, Instant.now()));
+    }
+
+    @Transactional(readOnly = true)
     public CustomerResponse get(UUID id) {
         return toResponse(requireCustomer(id));
     }
@@ -78,99 +93,6 @@ public class CustomerService {
     @Transactional
     public CustomerResponse create(CustomerRequest request) {
         return toResponse(createAndReturnEntity(request));
-    }
-
-    /**
-     * Complète l'e-mail des clients déjà liés à une facture Etsy importée (sync précédente sans email_r).
-     */
-    @Transactional
-    public int backfillEmailsFromEtsyReceipts(UUID workspaceId, List<com.nerd.erp.api.etsysync.EtsySyncReceiptDraft> receipts) {
-        SecurityContextHelper.requireWriteAccess();
-        UUID tenantId = SecurityContextHelper.requireTenantId();
-        workspaceService.requireInTenant(workspaceId, tenantId);
-        int updated = 0;
-        for (var draft : receipts) {
-            String email = blankToNull(draft.buyerEmail() != null ? draft.buyerEmail().trim() : null);
-            if (email == null) {
-                continue;
-            }
-            var invoice = invoiceRepository.findByTenantIdAndWorkspaceIdAndEtsyReceiptId(
-                    tenantId, workspaceId, draft.receiptId());
-            if (invoice.isEmpty()) {
-                continue;
-            }
-            Customer customer = requireCustomer(invoice.get().getCustomerId());
-            if (blankToNull(customer.getEmail()) != null) {
-                continue;
-            }
-            customer.setEmail(email);
-            customerRepository.save(customer);
-            updated++;
-        }
-        return updated;
-    }
-
-    /**
-     * Client Etsy : recherche par e-mail, sinon par nom ; met à jour l'adresse si le client existe déjà.
-     */
-    @Transactional
-    public Customer resolveFromEtsyImport(
-            UUID workspaceId,
-            String buyerName,
-            String email,
-            String addressLine1,
-            String addressLine2,
-            String postalCode,
-            String city,
-            String countryCode) {
-        SecurityContextHelper.requireWriteAccess();
-        UUID tenantId = SecurityContextHelper.requireTenantId();
-        workspaceService.requireInTenant(workspaceId, tenantId);
-
-        String trimmedEmail = blankToNull(email != null ? email.trim() : null);
-        NameParts name = splitBuyerName(buyerName);
-        String country = normalizeCountry(countryCode);
-
-        if (trimmedEmail != null) {
-            Optional<Customer> byEmail = customerRepository
-                    .findByTenantIdAndWorkspaceIdAndArchivedFalseAndEmailIgnoreCase(
-                            tenantId, workspaceId, trimmedEmail);
-            if (byEmail.isPresent()) {
-                Customer existing = byEmail.get();
-                applyEtsyShippingAddress(existing, addressLine1, addressLine2, postalCode, city, country);
-                mergeNameIfMissing(existing, name.firstName(), name.lastName());
-                return customerRepository.save(existing);
-            }
-        }
-
-        List<Customer> byName = customerRepository
-                .findByTenantIdAndWorkspaceIdAndArchivedFalseAndFirstNameIgnoreCaseAndLastNameIgnoreCase(
-                        tenantId, workspaceId, name.firstName(), name.lastName());
-        if (!byName.isEmpty()) {
-            Customer existing = byName.get(0);
-            if (trimmedEmail != null && blankToNull(existing.getEmail()) == null) {
-                existing.setEmail(trimmedEmail);
-            }
-            applyEtsyShippingAddress(existing, addressLine1, addressLine2, postalCode, city, country);
-            return customerRepository.save(existing);
-        }
-
-        return createAndReturnEntity(new CustomerRequest(
-                workspaceId,
-                CustomerType.INDIVIDUAL,
-                null,
-                name.firstName(),
-                name.lastName(),
-                trimmedEmail,
-                null,
-                blankToNull(addressLine1),
-                blankToNull(addressLine2),
-                blankToNull(postalCode),
-                blankToNull(city),
-                country,
-                CustomerStatus.CLIENT,
-                "Client Etsy",
-                null));
     }
 
     /**
@@ -301,66 +223,6 @@ public class CustomerService {
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Customer not found"));
         workspaceService.requireInTenant(customer.getWorkspaceId(), tenantId);
         return customer;
-    }
-
-    private void applyEtsyShippingAddress(
-            Customer customer,
-            String addressLine1,
-            String addressLine2,
-            String postalCode,
-            String city,
-            String countryCode) {
-        if (isNotBlank(addressLine1)) {
-            customer.setAddressLine1(addressLine1.trim());
-        }
-        if (isNotBlank(addressLine2)) {
-            customer.setAddressLine2(addressLine2.trim());
-        }
-        if (isNotBlank(postalCode)) {
-            customer.setPostalCode(postalCode.trim());
-        }
-        if (isNotBlank(city)) {
-            customer.setCity(city.trim());
-        }
-        if (isNotBlank(countryCode)) {
-            customer.setCountryCode(countryCode.trim().toUpperCase());
-        }
-    }
-
-    private static void mergeNameIfMissing(Customer customer, String firstName, String lastName) {
-        if (blankToNull(customer.getFirstName()) == null && isNotBlank(firstName)) {
-            customer.setFirstName(firstName);
-        }
-        if (blankToNull(customer.getLastName()) == null && isNotBlank(lastName)) {
-            customer.setLastName(lastName);
-        }
-    }
-
-    private static NameParts splitBuyerName(String buyerName) {
-        if (buyerName == null || buyerName.isBlank()) {
-            return new NameParts("Client", "Etsy");
-        }
-        String normalized = buyerName.trim().replaceAll("\\s+", " ");
-        int i = normalized.indexOf(' ');
-        if (i < 0) {
-            return new NameParts(normalized, "Etsy");
-        }
-        return new NameParts(normalized.substring(0, i), normalized.substring(i + 1).trim());
-    }
-
-    private static String normalizeCountry(String countryCode) {
-        if (countryCode == null || countryCode.isBlank()) {
-            return "FR";
-        }
-        String c = countryCode.trim();
-        return c.length() >= 2 ? c.substring(0, 2).toUpperCase() : "FR";
-    }
-
-    private static boolean isNotBlank(String s) {
-        return s != null && !s.isBlank();
-    }
-
-    private record NameParts(String firstName, String lastName) {
     }
 
     private void applyRequest(Customer customer, CustomerRequest request) {
