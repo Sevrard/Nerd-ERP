@@ -52,8 +52,18 @@ public final class AdminDtos {
             String displayName,
             TenantRole role,
             boolean enabled,
-            boolean platformAdmin
+            boolean platformAdmin,
+            /** Invitation en attente (mot de passe pas encore choisi). */
+            boolean pending,
+            Instant lastLoginAt
     ) {
+    }
+
+    /**
+     * Invitation émise lors d'une création. {@code activationUrl} n'est présent que si l'e-mail n'a pas
+     * pu partir (boîte plateforme non configurée) : l'admin transmet alors le lien lui-même.
+     */
+    public record Invitation(String email, boolean emailSent, String activationUrl) {
     }
 
     public record TenantDetail(
@@ -65,8 +75,14 @@ public final class AdminDtos {
             Instant updatedAt,
             long workspaceCount,
             List<TenantUser> users,
-            List<TenantModuleState> modules
+            List<TenantModuleState> modules,
+            /** Renseigné uniquement en réponse à une création de tenant / ajout d'utilisateur par invitation. */
+            Invitation invitation
     ) {
+        public TenantDetail withInvitation(Invitation invitation) {
+            return new TenantDetail(id, name, slug, active, createdAt, updatedAt, workspaceCount, users, modules,
+                    invitation);
+        }
     }
 
     public record TenantCreateRequest(
@@ -75,7 +91,7 @@ public final class AdminDtos {
             @Size(max = 255) String legalName,
             @NotBlank @Email @Size(max = 255) String ownerEmail,
             @Size(max = 255) String ownerDisplayName,
-            /** Requis si l'utilisateur n'existe pas encore. */
+            /** Optionnel : sans mot de passe, un nouvel utilisateur reçoit une invitation par e-mail. */
             @Size(min = 8, max = 128) String ownerPassword,
             @Size(max = 255) String workspaceName,
             List<ModuleCode> modules
@@ -101,7 +117,7 @@ public final class AdminDtos {
     public record TenantUserCreateRequest(
             @NotBlank @Email @Size(max = 255) String email,
             @Size(max = 255) String displayName,
-            /** Requis si l'utilisateur n'existe pas encore. */
+            /** Optionnel : sans mot de passe, un nouvel utilisateur reçoit une invitation par e-mail. */
             @Size(min = 8, max = 128) String password,
             @NotNull TenantRole role
     ) {

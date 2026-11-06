@@ -155,7 +155,7 @@ import { AdminApiService } from './admin-api.service';
               <input formControlName="ownerDisplayName" maxlength="255" class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-white" />
             </label>
             <label class="block text-sm text-slate-300 sm:col-span-2">
-              Mot de passe initial <span class="text-slate-500">(8 caractères min. ; inutile si l’utilisateur existe déjà)</span>
+              Mot de passe initial <span class="text-slate-500">(optionnel : sans mot de passe, le propriétaire reçoit une invitation par e-mail)</span>
               <input type="password" formControlName="ownerPassword" autocomplete="new-password" class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-white" />
             </label>
           </div>
@@ -301,7 +301,8 @@ export class AdminTenantsPageComponent {
       .subscribe({
         next: (created) => {
           this.createOpen.set(false);
-          void this.router.navigate(['/admin/tenants', created.id]);
+          // L'invitation éventuelle (lien à transmettre) est affichée par la page détail.
+          void this.router.navigate(['/admin/tenants', created.id], { state: { invitation: created.invitation } });
         },
         error: (err) => this.createError.set(apiErrorMessage(err, 'Création impossible')),
       });

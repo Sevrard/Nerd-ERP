@@ -1,13 +1,13 @@
 import { DatePipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { finalize, map, switchMap } from 'rxjs';
 import { AuthService } from '../../core/auth/auth.service';
 import { MODULES } from '../../core/modules/module.service';
-import { AdminModuleUpdate, AdminTenantDetail } from '../../shared/models/admin.model';
-import { ModuleCode, TenantRole } from '../../shared/models/auth.model';
+import { AdminInvitation, AdminModuleUpdate, AdminTenantDetail } from '../../shared/models/admin.model';
+import { ModuleCode, TenantRole, roleLabel } from '../../shared/models/auth.model';
 import { ErrorBannerComponent } from '../../shared/ui/error-banner.component';
 import { LoadingStateComponent } from '../../shared/ui/loading-state.component';
 import { apiErrorMessage } from '../../shared/utils/api-error.util';
@@ -18,13 +18,6 @@ interface ModuleDraft {
   enabled: boolean;
   expiresAt: string;
 }
-
-const ROLE_LABELS: Record<TenantRole, string> = {
-  OWNER: 'Propriétaire',
-  ADMIN: 'Administrateur',
-  USER: 'Utilisateur',
-  READONLY: 'Lecture seule',
-};
 
 @Component({
   selector: 'app-admin-tenant-detail-page',
@@ -142,6 +135,23 @@ const ROLE_LABELS: Record<TenantRole, string> = {
 
         <section class="rounded-xl border border-slate-800 bg-slate-900/50 p-6">
           <h2 class="text-lg font-semibold text-white">Utilisateurs</h2>
+
+          @if (invitation(); as inv) {
+            <div class="mt-4 rounded-lg border px-4 py-3 text-sm" [class]="inv.emailSent ? 'border-emerald-500/30 bg-emerald-950/30 text-emerald-200' : 'border-amber-500/30 bg-amber-950/30 text-amber-100'">
+              @if (inv.emailSent) {
+                E-mail envoyé à <span class="font-medium">{{ inv.email }}</span>.
+              } @else if (inv.activationUrl) {
+                <p>Aucune boîte d’envoi n’est configurée côté éditeur : transmettez ce lien d’activation à <span class="font-medium">{{ inv.email }}</span> (valable 7 jours).</p>
+                <div class="mt-2 flex flex-wrap items-center gap-2">
+                  <code class="max-w-full truncate rounded bg-black/30 px-2 py-1 text-xs">{{ inv.activationUrl }}</code>
+                  <button type="button" class="rounded-lg border border-amber-500/40 px-2.5 py-1 text-xs hover:bg-amber-900/40" (click)="copy(inv.activationUrl)">
+                    {{ copied() ? 'Copié' : 'Copier' }}
+                  </button>
+                </div>
+              }
+            </div>
+          }
+
           <div class="mt-4 overflow-hidden rounded-xl border border-slate-800">
             <table class="min-w-full divide-y divide-slate-800 text-sm">
               <thead class="bg-slate-900/80 text-left text-xs uppercase text-slate-500">
@@ -150,6 +160,8 @@ const ROLE_LABELS: Record<TenantRole, string> = {
                   <th class="px-4 py-3">Nom</th>
                   <th class="px-4 py-3">Rôle</th>
                   <th class="px-4 py-3">Statut</th>
+                  <th class="px-4 py-3">Dernière connexion</th>
+                  <th class="px-4 py-3"></th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-slate-800">
@@ -163,7 +175,23 @@ const ROLE_LABELS: Record<TenantRole, string> = {
                         <span class="ml-1 rounded-md border border-orange-500/30 px-1.5 py-0.5 text-[11px] text-orange-300">éditeur</span>
                       }
                     </td>
-                    <td class="px-4 py-3 text-slate-400">{{ u.enabled ? 'Actif' : 'Désactivé' }}</td>
+                    <td class="px-4 py-3">
+                      @if (u.pending) {
+                        <span class="rounded-full border border-amber-500/30 bg-amber-950/40 px-2 py-0.5 text-xs text-amber-300">Invitation en attente</span>
+                      } @else if (u.enabled) {
+                        <span class="text-slate-300">Actif</span>
+                      } @else {
+                        <span class="text-red-300">Désactivé</span>
+                      }
+                    </td>
+                    <td class="px-4 py-3 text-slate-400">{{ u.lastLoginAt ? (u.lastLoginAt | date: 'dd/MM/yyyy HH:mm') : '—' }}</td>
+                    <td class="px-4 py-3 text-right">
+                      @if (u.pending) {
+                        <button type="button" class="rounded-lg border border-slate-700 px-2.5 py-1 text-xs text-slate-200 hover:bg-slate-800 disabled:opacity-50" [disabled]="busy()" (click)="resend(u.userId)">
+                          Renvoyer l’invitation
+                        </button>
+                      }
+                    </td>
                   </tr>
                 }
               </tbody>
@@ -180,7 +208,7 @@ const ROLE_LABELS: Record<TenantRole, string> = {
               <input formControlName="displayName" class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-white" />
             </label>
             <label class="block text-sm text-slate-300">
-              Mot de passe <span class="text-slate-500">(si nouveau)</span>
+              Mot de passe <span class="text-slate-500">(optionnel : sinon invitation par e-mail)</span>
               <input type="password" formControlName="password" autocomplete="new-password" class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-white" />
             </label>
             <label class="block text-sm text-slate-300">
@@ -216,6 +244,11 @@ export class AdminTenantDetailPageComponent {
   readonly error = signal<string | null>(null);
   readonly actionError = signal<string | null>(null);
   readonly userError = signal<string | null>(null);
+  /** Invitation issue de la dernière création / ajout (ou transmise par la page de création). */
+  readonly invitation = signal<AdminInvitation | null>(
+    (inject(Router).getCurrentNavigation()?.extras.state?.['invitation'] as AdminInvitation | undefined) ?? null,
+  );
+  readonly copied = signal(false);
   readonly modulesSaved = signal(false);
   readonly moduleDrafts = signal<ModuleDraft[]>([]);
 
@@ -266,9 +299,7 @@ export class AdminTenantDetailPageComponent {
     return this.tenant()?.modules.find((m) => m.code === code) ?? null;
   }
 
-  roleLabel(role: TenantRole): string {
-    return ROLE_LABELS[role] ?? role;
-  }
+  readonly roleLabel = roleLabel;
 
   toggleModule(code: ModuleCode): void {
     this.modulesSaved.set(false);
@@ -331,19 +362,34 @@ export class AdminTenantDetailPageComponent {
       .subscribe({
         next: (updated) => {
           this.apply(updated);
+          this.invitation.set(updated.invitation);
+          this.copied.set(false);
           this.userForm.reset({ email: '', displayName: '', password: '', role: 'USER' });
         },
         error: (err) => this.userError.set(apiErrorMessage(err, 'Ajout impossible')),
       });
   }
 
-  private run(request: ReturnType<AdminApiService['updateTenant']>, onDone?: () => void): void {
+  resend(userId: string): void {
+    const t = this.tenant();
+    if (!t || this.busy()) {
+      return;
+    }
+    this.copied.set(false);
+    this.run(this.api.resendInvitation(t.id, userId), (updated) => this.invitation.set(updated.invitation));
+  }
+
+  copy(value: string): void {
+    void navigator.clipboard?.writeText(value).then(() => this.copied.set(true));
+  }
+
+  private run(request: ReturnType<AdminApiService['updateTenant']>, onDone?: (updated: AdminTenantDetail) => void): void {
     this.busy.set(true);
     this.actionError.set(null);
     request.pipe(finalize(() => this.busy.set(false))).subscribe({
       next: (updated) => {
         this.apply(updated);
-        onDone?.();
+        onDone?.(updated);
       },
       error: (err) => this.actionError.set(apiErrorMessage(err, 'Opération impossible')),
     });

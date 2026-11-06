@@ -8,8 +8,10 @@ public record LoginResponse(
         String accessToken,
         UUID userId,
         UUID tenantId,
+        String tenantSlug,
         TenantRole role,
         String email,
+        String displayName,
         boolean platformAdmin
 ) {
 }

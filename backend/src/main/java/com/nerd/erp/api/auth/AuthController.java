@@ -46,6 +46,7 @@ public class AuthController {
                 "userId", user.userId(),
                 "tenantId", user.tenantId(),
                 "email", user.email(),
+                "displayName", authService.displayNameOf(user),
                 "role", user.role(),
                 "platformAdmin", user.platformAdmin(),
                 "modules", modules,

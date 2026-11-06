@@ -1,5 +1,6 @@
 package com.nerd.erp.application.admin;
 
+import com.nerd.erp.api.admin.AdminDtos.Invitation;
 import com.nerd.erp.api.admin.AdminDtos.ModuleDefinition;
 import com.nerd.erp.api.admin.AdminDtos.ModuleUpdate;
 import com.nerd.erp.api.admin.AdminDtos.ModulesUpdateRequest;
@@ -11,6 +12,8 @@ import com.nerd.erp.api.admin.AdminDtos.TenantUpdateRequest;
 import com.nerd.erp.api.admin.AdminDtos.TenantUser;
 import com.nerd.erp.api.admin.AdminDtos.TenantUserCreateRequest;
 import com.nerd.erp.api.error.ApiException;
+import com.nerd.erp.application.account.InvitationService;
+import com.nerd.erp.application.account.InvitationService.Outcome;
 import com.nerd.erp.application.module.ModuleAccessService;
 import com.nerd.erp.application.tenancy.TenantStatusService;
 import com.nerd.erp.application.workspace.WorkspaceSlugHelper;
@@ -28,11 +31,11 @@ import com.nerd.erp.infrastructure.persistence.tenancy.AppUserRepository;
 import com.nerd.erp.infrastructure.persistence.tenancy.TenantMembershipRepository;
 import com.nerd.erp.infrastructure.persistence.tenancy.TenantRepository;
 import com.nerd.erp.infrastructure.persistence.workspace.WorkspaceRepository;
+import com.nerd.erp.infrastructure.security.core.AuthenticatedUser;
 import com.nerd.erp.infrastructure.security.core.SecurityContextHelper;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -65,7 +68,7 @@ public class AdminTenantService {
     private final TenantModuleRepository tenantModuleRepository;
     private final ModuleAccessService moduleAccessService;
     private final TenantStatusService tenantStatusService;
-    private final PasswordEncoder passwordEncoder;
+    private final InvitationService invitationService;
 
     public AdminTenantService(TenantRepository tenantRepository,
                               AppUserRepository appUserRepository,
@@ -75,7 +78,7 @@ public class AdminTenantService {
                               TenantModuleRepository tenantModuleRepository,
                               ModuleAccessService moduleAccessService,
                               TenantStatusService tenantStatusService,
-                              PasswordEncoder passwordEncoder) {
+                              InvitationService invitationService) {
         this.tenantRepository = tenantRepository;
         this.appUserRepository = appUserRepository;
         this.membershipRepository = membershipRepository;
@@ -84,7 +87,7 @@ public class AdminTenantService {
         this.tenantModuleRepository = tenantModuleRepository;
         this.moduleAccessService = moduleAccessService;
         this.tenantStatusService = tenantStatusService;
-        this.passwordEncoder = passwordEncoder;
+        this.invitationService = invitationService;
     }
 
     public List<ModuleDefinition> listModuleDefinitions() {
@@ -133,8 +136,10 @@ public class AdminTenantService {
         tenant.setActive(true);
         tenant = tenantRepository.save(tenant);
 
-        AppUser owner = findOrCreateUser(request.ownerEmail(), request.ownerDisplayName(), request.ownerPassword());
-        addMembership(tenant.getId(), owner.getId(), TenantRole.OWNER);
+        AuthenticatedUser current = SecurityContextHelper.requireUser();
+        Outcome outcome = invitationService.invite(tenant, request.ownerEmail(), request.ownerDisplayName(),
+                TenantRole.OWNER, request.ownerPassword(), current.userId(), inviterName(current));
+        AppUser owner = outcome.user();
 
         String legalName = blankToDefault(request.legalName(), tenant.getName());
         Organization org = new Organization();
@@ -169,7 +174,7 @@ public class AdminTenantService {
             tm.setActivatedAt(enabled ? Instant.now() : null);
             tenantModuleRepository.save(tm);
         }
-        return toDetail(tenant);
+        return toDetail(tenant).withInvitation(toInvitation(outcome));
     }
 
     @Transactional
@@ -216,13 +221,21 @@ public class AdminTenantService {
     @Transactional
     public TenantDetail addUser(UUID tenantId, TenantUserCreateRequest request) {
         Tenant tenant = requireTenant(tenantId);
-        AppUser user = findOrCreateUser(request.email(), request.displayName(), request.password());
-        if (membershipRepository.findByTenantIdAndUserId(tenantId, user.getId()).isPresent()) {
-            throw new ApiException(HttpStatus.CONFLICT, "USER_ALREADY_MEMBER",
-                    "Cet utilisateur a déjà accès à ce compte");
-        }
-        addMembership(tenantId, user.getId(), request.role());
-        return toDetail(tenant);
+        AuthenticatedUser current = SecurityContextHelper.requireUser();
+        Outcome outcome = invitationService.invite(tenant, request.email(), request.displayName(), request.role(),
+                request.password(), current.userId(), inviterName(current));
+        return toDetail(tenant).withInvitation(toInvitation(outcome));
+    }
+
+    /** Nouveau lien d'activation pour un utilisateur dont l'invitation est en attente. */
+    @Transactional
+    public TenantDetail resendInvitation(UUID tenantId, UUID userId) {
+        Tenant tenant = requireTenant(tenantId);
+        AuthenticatedUser current = SecurityContextHelper.requireUser();
+        AppUser user = appUserRepository.findById(userId)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Utilisateur introuvable"));
+        Outcome outcome = invitationService.resend(tenant, user, current.userId(), inviterName(current));
+        return toDetail(tenant).withInvitation(toInvitation(outcome));
     }
 
     private Tenant requireTenant(UUID tenantId) {
@@ -230,28 +243,15 @@ public class AdminTenantService {
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Compte introuvable"));
     }
 
-    private AppUser findOrCreateUser(String email, String displayName, String password) {
-        String normalizedEmail = email.trim().toLowerCase();
-        return appUserRepository.findByEmailIgnoreCase(normalizedEmail).orElseGet(() -> {
-            if (password == null || password.isBlank()) {
-                throw new ApiException(HttpStatus.BAD_REQUEST, "PASSWORD_REQUIRED",
-                        "Un mot de passe est requis pour créer un nouvel utilisateur");
-            }
-            AppUser user = new AppUser();
-            user.setEmail(normalizedEmail);
-            user.setDisplayName(blankToDefault(displayName, normalizedEmail));
-            user.setPasswordHash(passwordEncoder.encode(password));
-            user.setEnabled(true);
-            return appUserRepository.save(user);
-        });
+    private String inviterName(AuthenticatedUser current) {
+        return appUserRepository.findById(current.userId()).map(AppUser::getDisplayName).orElse(current.email());
     }
 
-    private void addMembership(UUID tenantId, UUID userId, TenantRole role) {
-        TenantMembership membership = new TenantMembership();
-        membership.setTenantId(tenantId);
-        membership.setUserId(userId);
-        membership.setRole(role);
-        membershipRepository.save(membership);
+    private static Invitation toInvitation(Outcome outcome) {
+        if (outcome.user().isPasswordSet() && !outcome.emailSent()) {
+            return null;
+        }
+        return new Invitation(outcome.user().getEmail(), outcome.emailSent(), outcome.activationUrl());
     }
 
     private TenantDetail toDetail(Tenant tenant) {
@@ -264,7 +264,7 @@ public class AdminTenantService {
             AppUser u = users.get(m.getUserId());
             if (u != null) {
                 tenantUsers.add(new TenantUser(u.getId(), u.getEmail(), u.getDisplayName(), m.getRole(),
-                        u.isEnabled(), u.isPlatformAdmin()));
+                        u.isEnabled(), u.isPlatformAdmin(), !u.isPasswordSet(), u.getLastLoginAt()));
             }
         }
         tenantUsers.sort(Comparator.comparing(TenantUser::email));
@@ -286,7 +286,7 @@ public class AdminTenantService {
                 tenant.getId(), tenant.getName(), tenant.getSlug(), tenant.isActive(),
                 tenant.getCreatedAt(), tenant.getUpdatedAt(),
                 workspaceRepository.countByTenantIdAndActiveTrue(tenant.getId()),
-                tenantUsers, modules);
+                tenantUsers, modules, null);
     }
 
     private static String resolveSlug(String requested, String name) {

@@ -4,6 +4,7 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
 import { WorkspaceService } from '../workspace/workspace.service';
 import { Workspace, WorkspaceUpdatePayload } from '../../shared/models/workspace.model';
 import { AuthService } from '../auth/auth.service';
+import { roleLabel } from '../../shared/models/auth.model';
 import { workspaceUi } from '../workspace/workspace-ui.config';
 import { SidebarNavModulesService } from './sidebar-nav-modules.service';
 import { LucideIconComponent } from '../../shared/ui/lucide-icon.component';
@@ -177,6 +178,30 @@ import { apiErrorMessage } from '../../shared/utils/api-error.util';
           </nav>
         }
 
+        @if (auth.canAdminister()) {
+          <p class="mb-2 mt-6 px-3 text-xs font-semibold uppercase tracking-wider text-slate-500">Paramètres</p>
+          <nav class="space-y-1" aria-label="Paramètres du workspace">
+            <a
+              routerLink="/settings/mail"
+              routerLinkActive="bg-slate-800/60 text-white"
+              class="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-400 transition-colors hover:bg-slate-800/50 hover:text-white"
+              (click)="layout.closeMobileSidebar()"
+            >
+              <app-lucide-icon name="mail" [size]="16" />
+              Messagerie
+            </a>
+            <a
+              routerLink="/settings/users"
+              routerLinkActive="bg-slate-800/60 text-white"
+              class="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-400 transition-colors hover:bg-slate-800/50 hover:text-white"
+              (click)="layout.closeMobileSidebar()"
+            >
+              <app-lucide-icon name="users" [size]="16" />
+              Utilisateurs
+            </a>
+          </nav>
+        }
+
         @if (auth.isPlatformAdmin()) {
           <p class="mb-2 mt-6 px-3 text-xs font-semibold uppercase tracking-wider text-slate-500">Éditeur</p>
           <nav class="space-y-1" aria-label="Administration plateforme">
@@ -194,11 +219,16 @@ import { apiErrorMessage } from '../../shared/utils/api-error.util';
       </div>
 
       <div class="mt-auto shrink-0 border-t border-slate-800 bg-[#0B0E11] p-4">
-        <p class="truncate text-sm font-medium text-white">{{ auth.profile()?.email }}</p>
-        <p class="text-xs text-slate-500">{{ auth.profile()?.role }}</p>
-        <button type="button" class="mt-3 text-xs text-slate-400 hover:text-white" (click)="auth.logout()">
-          Déconnexion
-        </button>
+        <a routerLink="/settings/profile" class="group block" title="Mon profil" (click)="layout.closeMobileSidebar()">
+          <p class="truncate text-sm font-medium text-white group-hover:text-brand-400">{{ auth.profile()?.displayName || auth.profile()?.email }}</p>
+          <p class="truncate text-xs text-slate-400" [title]="auth.profile()?.email">{{ auth.profile()?.email }}</p>
+          <p class="mt-0.5 text-xs text-slate-500">{{ roleLabel(auth.profile()?.role) }}</p>
+        </a>
+        <div class="mt-3 flex items-center gap-3 text-xs">
+          <a routerLink="/settings/profile" class="text-slate-400 hover:text-white" (click)="layout.closeMobileSidebar()">Mon profil</a>
+          <span class="text-slate-700">·</span>
+          <button type="button" class="text-slate-400 hover:text-white" (click)="auth.logout()">Déconnexion</button>
+        </div>
       </div>
     </aside>
 
@@ -518,6 +548,7 @@ import { apiErrorMessage } from '../../shared/utils/api-error.util';
 export class SidebarComponent {
   readonly workspaces = inject(WorkspaceService);
   readonly auth = inject(AuthService);
+  readonly roleLabel = roleLabel;
   readonly layout = inject(LayoutUiService);
   readonly navModules = inject(SidebarNavModulesService);
 

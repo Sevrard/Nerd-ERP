@@ -16,6 +16,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
+
 @Service
 public class AuthService {
 
@@ -37,10 +39,11 @@ public class AuthService {
         this.jwtService = jwtService;
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public LoginResponse login(LoginRequest request) {
         AppUser user = appUserRepository.findByEmailIgnoreCase(request.email())
                 .filter(AppUser::isEnabled)
+                .filter(AppUser::isPasswordSet)
                 .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Invalid credentials"));
         if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
             throw new ApiException(HttpStatus.UNAUTHORIZED, "Invalid credentials");
@@ -50,10 +53,26 @@ public class AuthService {
                 .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Invalid tenant"));
         TenantMembership membership = membershipRepository.findByTenantIdAndUserId(tenant.getId(), user.getId())
                 .orElseThrow(() -> new ApiException(HttpStatus.FORBIDDEN, "No access to tenant"));
+        return openSession(user, tenant, membership);
+    }
+
+    /** Émet un JWT pour un utilisateur déjà authentifié (connexion, activation de compte) et trace la connexion. */
+    @Transactional
+    public LoginResponse openSession(AppUser user, Tenant tenant, TenantMembership membership) {
+        user.setLastLoginAt(Instant.now());
+        appUserRepository.save(user);
         AuthenticatedUser authUser = new AuthenticatedUser(user.getId(), tenant.getId(), membership.getRole(),
                 user.getEmail(), user.isPlatformAdmin());
         String token = jwtService.generateToken(authUser);
-        return new LoginResponse(token, user.getId(), tenant.getId(), membership.getRole(), user.getEmail(),
-                user.isPlatformAdmin());
+        return new LoginResponse(token, user.getId(), tenant.getId(), tenant.getSlug(), membership.getRole(),
+                user.getEmail(), user.getDisplayName(), user.isPlatformAdmin());
+    }
+
+    /** Nom affiché de l'utilisateur ; repli sur l'e-mail si le compte a disparu. */
+    @Transactional(readOnly = true)
+    public String displayNameOf(AuthenticatedUser user) {
+        return appUserRepository.findById(user.userId())
+                .map(AppUser::getDisplayName)
+                .orElse(user.email());
     }
 }

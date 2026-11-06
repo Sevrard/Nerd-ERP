@@ -79,4 +79,9 @@ public class AdminTenantController {
     public TenantDetail addUser(@PathVariable UUID id, @Valid @RequestBody TenantUserCreateRequest request) {
         return adminTenantService.addUser(id, request);
     }
+
+    @PostMapping("/tenants/{id}/users/{userId}/invitations")
+    public TenantDetail resendInvitation(@PathVariable UUID id, @PathVariable UUID userId) {
+        return adminTenantService.resendInvitation(id, userId);
+    }
 }

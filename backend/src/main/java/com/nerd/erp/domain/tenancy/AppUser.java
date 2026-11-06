@@ -9,6 +9,7 @@ import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.annotations.UuidGenerator;
 
+import java.time.Instant;
 import java.util.UUID;
 
 @Entity
@@ -36,4 +37,11 @@ public class AppUser extends AuditableEntity {
     /** Administrateur de la plateforme (éditeur) : accès à /api/v1/admin/** quel que soit le tenant. */
     @Column(name = "platform_admin", nullable = false)
     private boolean platformAdmin = false;
+
+    /** Faux tant qu'un utilisateur invité n'a pas choisi son mot de passe (invitation en attente). */
+    @Column(name = "password_set", nullable = false)
+    private boolean passwordSet = true;
+
+    @Column(name = "last_login_at")
+    private Instant lastLoginAt;
 }

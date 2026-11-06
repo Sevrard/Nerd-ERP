@@ -43,4 +43,8 @@ export class AdminApiService {
   addUser(id: string, payload: AdminTenantUserCreatePayload) {
     return this.api.post<AdminTenantDetail>(`/admin/tenants/${id}/users`, payload);
   }
+
+  resendInvitation(id: string, userId: string) {
+    return this.api.post<AdminTenantDetail>(`/admin/tenants/${id}/users/${userId}/invitations`, {});
+  }
 }

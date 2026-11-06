@@ -32,6 +32,16 @@ export interface AdminTenantUser {
   role: TenantRole;
   enabled: boolean;
   platformAdmin: boolean;
+  /** Invitation en attente (mot de passe pas encore choisi). */
+  pending: boolean;
+  lastLoginAt: string | null;
+}
+
+/** `activationUrl` n'est fourni que si l'e-mail n'a pas pu partir (boîte éditeur non configurée). */
+export interface AdminInvitation {
+  email: string;
+  emailSent: boolean;
+  activationUrl: string | null;
 }
 
 export interface AdminTenantDetail {
@@ -44,6 +54,8 @@ export interface AdminTenantDetail {
   workspaceCount: number;
   users: AdminTenantUser[];
   modules: AdminTenantModuleState[];
+  /** Renseigné uniquement après une création / un ajout d'utilisateur par invitation. */
+  invitation: AdminInvitation | null;
 }
 
 export interface AdminTenantCreatePayload {

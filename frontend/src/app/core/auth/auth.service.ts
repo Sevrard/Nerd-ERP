@@ -42,25 +42,35 @@ export class AuthService {
   }
 
   login(payload: LoginRequest) {
-    return this.api.post<LoginResponse>('/auth/login', payload).pipe(
-      tap((res) => {
-        localStorage.setItem(TOKEN_KEY, res.accessToken);
-        localStorage.setItem(TENANT_SLUG_KEY, payload.tenantSlug);
-        localStorage.setItem(ROLE_KEY, res.role);
-        this.tokenSignal.set(res.accessToken);
-        this.profileLoadedSignal.set(false);
-        this.profileRequest$ = null;
-        this.profileSignal.set({
-          userId: res.userId,
-          tenantId: res.tenantId,
-          email: res.email,
-          role: res.role,
-          platformAdmin: res.platformAdmin,
-          modules: [],
-          workspaces: [],
-        });
-      }),
-    );
+    return this.api.post<LoginResponse>('/auth/login', payload).pipe(tap((res) => this.openSession(res)));
+  }
+
+  /** Installe une session à partir d'une réponse de connexion (login ou activation de compte). */
+  openSession(res: LoginResponse): void {
+    localStorage.setItem(TOKEN_KEY, res.accessToken);
+    localStorage.setItem(TENANT_SLUG_KEY, res.tenantSlug);
+    localStorage.setItem(ROLE_KEY, res.role);
+    this.tokenSignal.set(res.accessToken);
+    this.profileLoadedSignal.set(false);
+    this.profileRequest$ = null;
+    this.profileSignal.set({
+      userId: res.userId,
+      tenantId: res.tenantId,
+      email: res.email,
+      displayName: res.displayName,
+      role: res.role,
+      platformAdmin: res.platformAdmin,
+      modules: [],
+      workspaces: [],
+    });
+  }
+
+  /** Met à jour le nom affiché localement (après modification du profil). */
+  updateDisplayName(displayName: string): void {
+    const current = this.profileSignal();
+    if (current) {
+      this.profileSignal.set({ ...current, displayName });
+    }
   }
 
   loadProfile() {
